@@ -236,8 +236,8 @@ export function buildFilename(
 /**
  * [1.0.0 / spec 0009] Rename an existing note to match the current
  * `item.title` + filename template if the two have drifted (typically
- * because the user changed `metadataLanguage` or `metadataFallbackLanguage`,
- * or edited the template). Uses `app.fileManager.renameFile` so internal
+ * because source metadata changed or the user edited the template). Uses
+ * `app.fileManager.renameFile` so internal
  * Obsidian links to this note auto-update.
  *
  * Returns true if a rename actually happened, false otherwise. Bails when
@@ -1178,7 +1178,6 @@ export class SyncEngine {
             item.ids.tmdb!,
             this.settings.tmdbApiKey,
             this.settings.posterSize,
-            "",
             this.settings.tmdbCache,
             this.settings.tmdbCacheTtlDays,
           )
@@ -1201,12 +1200,12 @@ export class SyncEngine {
     const folderPath = normalizePath(this.settings.folder);
     await ensureFolder(this.app, folderPath);
 
-    // Fetch poster + (optionally) translation per item from TMDB. We use a
+    // Fetch posters from TMDB. We use a
     // bounded concurrency pool (5 in flight) instead of a Promise.all burst:
     //   - lets the status bar show real progress while running
     //   - keeps us comfortably under TMDB's 50 req/s rate limit
     //   - 1000+ item libraries no longer blast the rate-limit bucket and
-    //     silently lose posters/translations to swallowed 429s
+    //     silently lose posters to swallowed 429s
     const itemList = [...mergedItems.values()];
     await this.enrichMetadata(itemList, onProgress);
 

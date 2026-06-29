@@ -36,21 +36,11 @@ export interface TmdbMovieResponse {
   poster_path: string | null;
 }
 
-/**
- * Compose the cache key for an item. The legacy language arguments remain so
- * existing caches can still be read while this English-only fork settles.
- */
 export function tmdbCacheKey(
   mediaType: "movie" | "tv",
   tmdbId: number,
-  language: string,
-  fallback: string = "",
 ): string {
-  const langPart = language || "default";
-  if (fallback) {
-    return `${mediaType}:${tmdbId}:${langPart}:fb=${fallback}`;
-  }
-  return `${mediaType}:${tmdbId}:${langPart}`;
+  return `${mediaType}:${tmdbId}`;
 }
 
 /**
@@ -166,20 +156,16 @@ export async function fetchMovieMetadata(
   tmdbId: number,
   apiKey: string,
   size: PosterSize,
-  language: string,
   cache: TmdbCache,
   ttlDays: number,
-  fallbackLanguage: string = "",
 ): Promise<TmdbMetadata> {
   return fetchTmdbMetadataCached(
     "movie",
     tmdbId,
     apiKey,
     size,
-    language,
     cache,
     ttlDays,
-    fallbackLanguage,
   );
 }
 
@@ -187,20 +173,16 @@ export async function fetchTvMetadata(
   tmdbId: number,
   apiKey: string,
   size: PosterSize,
-  language: string,
   cache: TmdbCache,
   ttlDays: number,
-  fallbackLanguage: string = "",
 ): Promise<TmdbMetadata> {
   return fetchTmdbMetadataCached(
     "tv",
     tmdbId,
     apiKey,
     size,
-    language,
     cache,
     ttlDays,
-    fallbackLanguage,
   );
 }
 
@@ -209,12 +191,10 @@ async function fetchTmdbMetadataCached(
   tmdbId: number,
   apiKey: string,
   size: PosterSize,
-  language: string,
   cache: TmdbCache,
   ttlDays: number,
-  fallbackLanguage: string = "",
 ): Promise<TmdbMetadata> {
-  const key = tmdbCacheKey(mediaType, tmdbId, language, fallbackLanguage);
+  const key = tmdbCacheKey(mediaType, tmdbId);
   const entry = cache[key];
   const freshness = cacheEntryFreshness(entry);
 
@@ -236,11 +216,9 @@ async function fetchTmdbMetadataCached(
         tmdbId,
         apiKey,
         size,
-        language,
         cache,
         ttlDays,
         key,
-        fallbackLanguage,
       );
     }
     return { poster_url: entry.poster_url };
@@ -252,8 +230,6 @@ async function fetchTmdbMetadataCached(
     tmdbId,
     apiKey,
     size,
-    language,
-    fallbackLanguage,
   );
   // Only cache successful fetches. A response that's both empty AND has no
   // poster suggests TMDB returned an error or we got rate-limited; we'd
@@ -262,7 +238,6 @@ async function fetchTmdbMetadataCached(
     cache[key] = {
       cache_version: TMDB_CACHE_ENTRY_VERSION,
       poster_url: fresh.poster_url,
-      translation: null,
       cached_at: Date.now(),
       expires_at: computeCacheExpiry(ttlDays),
     };
@@ -275,11 +250,9 @@ async function revalidateInBackground(
   tmdbId: number,
   apiKey: string,
   size: PosterSize,
-  language: string,
   cache: TmdbCache,
   ttlDays: number,
   key: string,
-  fallbackLanguage: string = "",
 ): Promise<void> {
   try {
     const fresh = await fetchTmdbMetadata(
@@ -287,14 +260,11 @@ async function revalidateInBackground(
       tmdbId,
       apiKey,
       size,
-      language,
-      fallbackLanguage,
     );
     if (fresh.poster_url) {
       cache[key] = {
         cache_version: TMDB_CACHE_ENTRY_VERSION,
         poster_url: fresh.poster_url,
-        translation: null,
         cached_at: Date.now(),
         expires_at: computeCacheExpiry(ttlDays),
       };
@@ -343,8 +313,6 @@ async function fetchTmdbMetadata(
   tmdbId: number,
   apiKey: string,
   size: PosterSize,
-  language: string,
-  fallbackLanguage: string = "",
 ): Promise<TmdbMetadata> {
   try {
     const params = new URLSearchParams({ api_key: apiKey });

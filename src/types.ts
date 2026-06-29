@@ -133,16 +133,6 @@ export interface TraktTokenResponse {
 
 // ── TMDB API Response Types ──
 
-export interface TmdbMovieResponse {
-  id: number;
-  poster_path: string | null;
-}
-
-export interface TmdbTvResponse {
-  id: number;
-  poster_path: string | null;
-}
-
 // ── Internal Types ──
 
 export type ItemType = "movie" | "show";
@@ -253,19 +243,8 @@ export interface TmdbCacheEntry {
    */
   cache_version?: number;
   poster_url: string;
-  translation: TmdbTranslationData | null;
   cached_at: number;
   expires_at: number;
-}
-
-/** Cached form of a TMDB translation. Mirrors `TmdbTranslation` from
- * tmdb-api.ts but lives here in types.ts so the cache's data shape is
- * declared independently of the API client. */
-export interface TmdbTranslationData {
-  title: string;
-  overview: string;
-  tagline: string;
-  genres: string[];
 }
 
 export interface TmdbCache {
@@ -295,9 +274,7 @@ export interface NormalizedItem {
   first_aired?: string;
   // TMDB poster
   poster_url?: string;
-  // Originals (always English from Trakt). Surface-level fields above may be
-  // overridden by translations when metadataLanguage is set; these always
-  // hold the source-language values so tags and {{original_*}} stay stable.
+  // Original Trakt values used by tags and custom {{original_*}} variables.
   originalTitle: string;
   originalOverview: string;
   originalTagline?: string;

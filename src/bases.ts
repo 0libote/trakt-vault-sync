@@ -25,7 +25,6 @@ export type BaseFieldGroup =
   | "activity"
   | "progress"
   | "release"
-  | "localization"
   | "links"
   | "sync";
 
@@ -35,7 +34,6 @@ export const BASE_FIELD_GROUPS: ReadonlyArray<BaseFieldGroup> = [
   "activity",
   "progress",
   "release",
-  "localization",
   "links",
   "sync",
 ];
@@ -71,11 +69,6 @@ export type BaseDisplayField =
   | "first_aired"
   | "released"
   | "tagline"
-  | "original_title"
-  | "original_overview"
-  | "original_tagline"
-  | "original_genres"
-  | "metadata_language"
   | "trakt_id"
   | "slug"
   | "imdb_id"
@@ -119,11 +112,6 @@ type BasePropertyKey =
   | "first_aired"
   | "released"
   | "tagline"
-  | "original_title"
-  | "original_overview"
-  | "original_tagline"
-  | "original_genres"
-  | "metadata_language"
   | "id"
   | "slug"
   | "imdb_id"
@@ -163,11 +151,6 @@ export const BASE_PROPERTY_KEYS: ReadonlyArray<BasePropertyKey> = [
   "first_aired",
   "released",
   "tagline",
-  "original_title",
-  "original_overview",
-  "original_tagline",
-  "original_genres",
-  "metadata_language",
   "id",
   "slug",
   "imdb_id",
@@ -363,36 +346,6 @@ export const BASE_DISPLAY_FIELD_DEFINITIONS: ReadonlyArray<BaseDisplayFieldDefin
       group: "release",
       labelKey: "bases.field.tagline",
       orderItem: "tagline",
-    },
-    {
-      id: "original_title",
-      group: "localization",
-      labelKey: "bases.field.originalTitle",
-      orderItem: "original_title",
-    },
-    {
-      id: "original_overview",
-      group: "localization",
-      labelKey: "bases.field.originalOverview",
-      orderItem: "original_overview",
-    },
-    {
-      id: "original_tagline",
-      group: "localization",
-      labelKey: "bases.field.originalTagline",
-      orderItem: "original_tagline",
-    },
-    {
-      id: "original_genres",
-      group: "localization",
-      labelKey: "bases.field.originalGenres",
-      orderItem: "original_genres",
-    },
-    {
-      id: "metadata_language",
-      group: "localization",
-      labelKey: "bases.field.metadataLanguage",
-      orderItem: "metadata_language",
     },
     {
       id: "trakt_id",
@@ -856,30 +809,6 @@ function buildBase(settings: TraktrSettings, kind: BaseFileKind): string {
 
 export function buildBasePropertyName(prefix: string, key: string): string {
   return `${prefix}${key}`;
-}
-
-export function buildMoviesBase(settings: TraktrSettings): string {
-  return buildBase(settings, "movies");
-}
-
-export function buildShowsBase(settings: TraktrSettings): string {
-  return buildBase(settings, "shows");
-}
-
-export function buildWatchlistBase(settings: TraktrSettings): string {
-  return buildBase(settings, "watchlist");
-}
-
-export function buildWatchedBase(settings: TraktrSettings): string {
-  return buildBase(settings, "watched");
-}
-
-export function buildRatingsBase(settings: TraktrSettings): string {
-  return buildBase(settings, "ratings");
-}
-
-export function buildLibraryBase(settings: TraktrSettings): string {
-  return buildBase(settings, "library");
 }
 
 export function getBaseFileDefinitions(

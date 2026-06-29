@@ -18,7 +18,6 @@ import type { App } from "obsidian";
 import { normalizePath, TFile } from "obsidian";
 import type { NormalizedItem, DailyNoteEvent, DailyNoteEventAction } from "./types";
 import type { TraktrSettings } from "./settings";
-import { getEffectiveTemplateLanguage } from "./settings";
 
 /**
  * Hard cap on catch-up range. If the user was away longer than this,
@@ -569,7 +568,7 @@ export async function processDate(
     }
     const events = aggregateEventsForDate(date, host.getMergedItems(), settings);
     if (events.length === 0) return { status: "skipped_no_file" };
-    const lang = getEffectiveTemplateLanguage(settings);
+    const lang = "en";
     const block = renderMarkerBlock(
       events,
       settings.dailyNotesMarkerStart,
@@ -608,7 +607,7 @@ export async function processDate(
     // Nothing to write and no existing region to refresh; do nothing.
     return { status: "skipped_no_file" };
   }
-  const lang = getEffectiveTemplateLanguage(settings);
+  const lang = "en";
   const syncMode = settings.dailyNotesSyncMode ?? "default";
 
   // [0.8.0] "incremental" mode: only append new event lines that aren't
@@ -745,7 +744,7 @@ export async function manualBackfill(
  * Uses the same English rendering as actual Daily Notes.
  */
 export function renderPreview(settings: TraktrSettings): string {
-  const lang = getEffectiveTemplateLanguage(settings);
+  const lang = "en";
   const examples: DailyNoteEvent[] = [
     {
       timestamp: "2026-05-11T10:00:00Z",

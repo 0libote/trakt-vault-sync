@@ -1,9 +1,5 @@
 import type { NormalizedItem, EpisodeWatchHistory } from "./types";
 import type { TraktrSettings } from "./settings";
-import {
-  getEffectiveMetadataLanguage,
-  getEffectiveTemplateLanguage,
-} from "./settings";
 import { renderTemplate, toFrontmatter } from "./utils";
 
 /**
@@ -58,7 +54,7 @@ export function renderWatchHistorySection(
   const list = renderWatchHistoryList(item);
   if (!list) return "";
   const heading = watchHistoryHeading(
-    getEffectiveTemplateLanguage(settings),
+    "en",
   );
   return `${WATCH_HISTORY_MARKER_START}\n## ${heading}\n${list}\n${WATCH_HISTORY_MARKER_END}`;
 }
@@ -205,14 +201,12 @@ function buildTemplateContext(
     favorited_at: item.favorited_at || "",
     my_rating: item.my_rating || "",
     rated_at: item.rated_at || "",
-    // i18n: originals are always available, even when localization is off,
-    // so users can opt into stable English filenames or template fields
-    // without flipping the global setting.
+    // Original Trakt values remain available to custom templates.
     original_title: item.originalTitle,
     original_overview: item.originalOverview,
     original_tagline: item.originalTagline || "",
     original_genres: item.originalGenres.join(", "),
-    metadata_language: getEffectiveMetadataLanguage(settings),
+    metadata_language: "",
     // Watch history (only populated when syncWatchedDetail is on AND the
     // item appears in /sync/history). When empty, both variables resolve to
     // empty strings so default-template lines collapse cleanly.
@@ -240,14 +234,10 @@ export function buildFrontmatterData(
   const p = settings.propertyPrefix;
   // When localization is off (effective language is empty), trakt_original_*
   // fields are NOT written — preserves byte-for-byte default behavior.
-  const lang = getEffectiveMetadataLanguage(settings);
-  const i18nOn = lang !== "";
-
   const data: Record<string, unknown> = {};
 
   // Core metadata
   data[`${p}title`] = item.title;
-  if (i18nOn) data[`${p}original_title`] = item.originalTitle;
   data[`${p}year`] = item.year;
   data[`${p}type`] = item.type;
   data[`${p}id`] = item.ids.trakt;
@@ -255,7 +245,6 @@ export function buildFrontmatterData(
   data[`${p}imdb_id`] = item.ids.imdb || null;
   data[`${p}tmdb_id`] = item.ids.tmdb || null;
   data[`${p}genres`] = item.genres;
-  if (i18nOn) data[`${p}original_genres`] = item.originalGenres;
   data[`${p}runtime`] = item.runtime;
   data[`${p}certification`] = item.certification;
   data[`${p}rating`] = item.rating;
@@ -268,15 +257,11 @@ export function buildFrontmatterData(
   data[`${p}language`] = item.language;
   data[`${p}status`] = item.status;
   data[`${p}overview`] = item.overview;
-  if (i18nOn) data[`${p}original_overview`] = item.originalOverview;
 
   // Movie-specific
   if (item.type === "movie") {
     data[`${p}released`] = item.released || null;
     data[`${p}tagline`] = item.tagline || null;
-    if (i18nOn) {
-      data[`${p}original_tagline`] = item.originalTagline || null;
-    }
   }
 
   // Show-specific
@@ -327,7 +312,6 @@ export function buildFrontmatterData(
   data[`${p}imdb_url`] = imdbUrl(item);
   data[`${p}poster_url`] = item.poster_url || null;
   data[`${p}synced_at`] = new Date().toISOString();
-  if (i18nOn) data[`${p}metadata_language`] = lang;
 
   if (settings.addTags) {
     const tagPfx = settings.tagPrefix;
@@ -389,13 +373,6 @@ export function renderNote(
  * Render only the frontmatter section for an item.
  * Used when updating existing notes without overwriting the body.
  */
-export function renderFrontmatterOnly(
-  item: NormalizedItem,
-  settings: TraktrSettings
-): string {
-  return toFrontmatter(buildFrontmatterData(item, settings));
-}
-
 function numericValue(value: unknown): number | undefined {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.trim() !== "") {

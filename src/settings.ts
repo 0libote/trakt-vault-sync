@@ -203,18 +203,6 @@ export const LOCAL_KEYS_SCHEMA_STORAGE_KEY = `${LOCAL_STORAGE_PREFIX}_localKeysS
  * even though the plugin only ships translated default templates for English
  * and Simplified/Traditional Chinese (other codes resolve to the English
  * default — users can still customize manually). */
-export function getEffectiveMetadataLanguage(_settings: TraktrSettings): string {
-  return "";
-}
-
-export function getEffectiveMetadataFallbackLanguage(_settings: TraktrSettings): string {
-  return "";
-}
-
-export function getEffectiveTemplateLanguage(_settings: TraktrSettings): string {
-  return "";
-}
-
 export interface TraktrSettings {
   // Authentication
   clientId: string;
@@ -227,24 +215,6 @@ export interface TraktrSettings {
   tmdbApiKey: string;
   posterSize: PosterSize;
 
-  // Legacy keys retained so existing data.json files load safely. They are
-  // fixed to English and are no longer exposed in settings.
-  // metadataLanguage: dropdown value — "" (disabled), one of the presets, or
-  //   the literal string "custom".
-  // customMetadataLanguage: user-typed code, only consulted when
-  //   metadataLanguage === "custom".
-  // uiLanguage: language of the plugin's settings tab, command names, and
-  //   notice popups.
-  // templateLanguage: language used by the bundled default Movie / Show note
-  //   templates. Same dropdown shape as metadataLanguage (preset codes +
-  //   "custom"). The "Reset to default" button on each template applies this.
-  // customTemplateLanguage: user-typed code, only consulted when
-  //   templateLanguage === "custom".
-  metadataLanguage: string;
-  customMetadataLanguage: string;
-  // [0.9.0] Secondary language used when the primary metadata language has no
-  // translation for an item.
-  metadataFallbackLanguage: string;
   // [1.0.0] When true, every sync compares each existing note's filename
   // against what the current title + filename-template would produce, and
   // renames via app.fileManager.renameFile (which auto-updates internal
@@ -253,8 +223,6 @@ export interface TraktrSettings {
   // manually flip this off. See spec 0009.
   autoRenameOnLanguageChange: boolean;
   uiLanguage: UiLanguage;
-  templateLanguage: string;
-  customTemplateLanguage: string;
 
   // Property namespace
   propertyPrefix: string;
@@ -423,13 +391,8 @@ export const DEFAULT_SETTINGS: TraktrSettings = {
   tmdbApiKey: "",
   posterSize: "w500",
 
-  metadataLanguage: "",
-  customMetadataLanguage: "",
-  metadataFallbackLanguage: "",
   autoRenameOnLanguageChange: true,
   uiLanguage: "en",
-  templateLanguage: "",
-  customTemplateLanguage: "",
 
   propertyPrefix: "trakt_",
 
@@ -662,7 +625,6 @@ export class TraktrSettingTab extends PluginSettingTab {
       activity: "bases.group.activity",
       progress: "bases.group.progress",
       release: "bases.group.release",
-      localization: "bases.group.localization",
       links: "bases.group.links",
       sync: "bases.group.sync",
     };
