@@ -1,0 +1,771 @@
+/**
+ * [0.7.0] Daily Notes integration. Inserts per-event lines into the
+ * user's Daily Note for each sync. See spec 0006 for the full design
+ * + 26-row edge-case matrix.
+ *
+ * Safety contract (the spec's most important property):
+ * > For every Daily Note file on disk, content outside the marker
+ * > region must be byte-for-byte identical before and after every
+ * > catch-up run. No exceptions.
+ *
+ * This module owns the algorithm; the Obsidian-API-bound parts live
+ * in main.ts / settings.ts (vault.read, vault.process, etc.). Pure
+ * logic here is unit-testable; the rest is verified by manual smoke
+ * during release.
+ */
+
+import type { App } from "obsidian";
+import { normalizePath, TFile } from "obsidian";
+import type { NormalizedItem, DailyNoteEvent, DailyNoteEventAction } from "./types";
+import type { TraktrSettings } from "./settings";
+import { getEffectiveTemplateLanguage } from "./settings";
+
+/**
+ * Hard cap on catch-up range. If the user was away longer than this,
+ * we clip the cursor to (today - SAFETY_CAP). The remaining gap can be
+ * filled manually via the Backfill button (which has its own 30-day
+ * cap). See spec 0006 edge case 12.
+ */
+const SAFETY_CAP_DAYS = 90;
+
+// ── Date helpers ──
+
+/** "YYYY-MM-DD" for today in the system local timezone. */
+export function localTodayISODate(now: Date = new Date()): string {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/** "YYYY-MM-DD" of a date relative to system local timezone. */
+export function localISODate(dateOrIso: Date | string): string {
+  const d = typeof dateOrIso === "string" ? new Date(dateOrIso) : dateOrIso;
+  return localTodayISODate(d);
+}
+
+/** "HH:MM" in local 24-hour time. */
+export function localHHMM(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "??:??";
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/** Add N days to a "YYYY-MM-DD" string and return another "YYYY-MM-DD". */
+export function addDaysISO(date: string, days: number): string {
+  const [y, m, d] = date.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+  return localTodayISODate(dt);
+}
+
+/**
+ * [1.0.0] Return inclusive `{start, end}` ISO dates for the calendar
+ * month that contains `today`. `end` clamps at today — we don't preview
+ * future days for the current month even though they exist on the
+ * calendar. Used by BackfillRangeModal's "This month" preset.
+ */
+export function computeThisMonth(today: string): { start: string; end: string } {
+  const [y, m] = today.split("-").map(Number);
+  const start = `${y}-${String(m).padStart(2, "0")}-01`;
+  return { start, end: today };
+}
+
+/**
+ * [1.0.0] Return inclusive `{start, end}` ISO dates for the previous
+ * calendar month relative to `today`. Both endpoints are full-month
+ * (no clamping needed — last month is fully in the past).
+ * Used by BackfillRangeModal's "Last month" preset.
+ */
+export function computeLastMonth(today: string): { start: string; end: string } {
+  const [y, m] = today.split("-").map(Number);
+  const prevY = m === 1 ? y - 1 : y;
+  const prevM = m === 1 ? 12 : m - 1;
+  const start = `${prevY}-${String(prevM).padStart(2, "0")}-01`;
+  // `new Date(y, m-1, 0)` returns day 0 of month (m-1) 0-indexed,
+  // which == last day of the previous month (1-indexed). E.g. today
+  // is May (m=5) → Date(y, 4, 0) = April 30.
+  const lastDay = new Date(y, m - 1, 0).getDate();
+  const end = `${prevY}-${String(prevM).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+  return { start, end };
+}
+
+/** Inclusive day delta between two "YYYY-MM-DD" strings: from <= to. */
+export function daysBetweenISO(from: string, to: string): number {
+  const [fy, fm, fd] = from.split("-").map(Number);
+  const [ty, tm, td] = to.split("-").map(Number);
+  const f = new Date(fy, fm - 1, fd).getTime();
+  const t = new Date(ty, tm - 1, td).getTime();
+  return Math.round((t - f) / 86_400_000);
+}
+
+// ── Path computation ──
+
+/**
+ * Render the Daily Note path for a given ISO date, using Obsidian's
+ * bundled moment.js for the filename format. Folder + ".md" appended.
+ *
+ * Examples:
+ *   folder="Daily", format="YYYY-MM-DD", date="2026-05-11"
+ *     → "Daily/2026-05-11.md"
+ *   folder="01 Daily", format="YYYY/YYYY.MM.DD", date="2026-05-11"
+ *     → "01 Daily/2026/2026.05.11.md"
+ */
+export function computeDailyNotePath(
+  date: string,
+  folder: string,
+  format: string,
+  momentFn: (input: string, fmt: string) => { format(out: string): string },
+): string {
+  const parsed = momentFn(date, "YYYY-MM-DD");
+  const filename = parsed.format(format);
+  const base = folder.replace(/^\/+|\/+$/g, ""); // strip leading/trailing slashes
+  const full = base ? `${base}/${filename}.md` : `${filename}.md`;
+  return normalizePath(full);
+}
+
+// ── Marker handling ──
+
+/**
+ * Check that BOTH markers are present in the content AND end appears
+ * after start. Missing-pair / inverted order / only-one-side all
+ * return false → caller treats as "no valid markers".
+ *
+ * [0.7.1] Also reject empty or identical start/end strings. If a user
+ * sets both markers to the same string (e.g. both "%%"), the function
+ * could otherwise find two occurrences of that same string and treat
+ * them as a "pair", causing `replaceMarkerBlock` to mangle non-marker
+ * content between them. Requiring distinct strings closes that
+ * loophole — same fix Obsidian's own native section markers use.
+ */
+export function isMarkerRegionValid(
+  content: string,
+  markerStart: string,
+  markerEnd: string,
+): boolean {
+  if (!markerStart || !markerEnd) return false;
+  if (markerStart === markerEnd) return false;
+  const startIdx = content.indexOf(markerStart);
+  if (startIdx === -1) return false;
+  const endIdx = content.indexOf(markerEnd, startIdx + markerStart.length);
+  return endIdx !== -1;
+}
+
+/**
+ * Returns true if the region between a valid marker pair contains only
+ * whitespace. Returns false if markers are missing/invalid OR the region
+ * has any non-whitespace content.
+ *
+ * [0.7.2] Used by past-day catch-up + backfill to distinguish two cases:
+ *   - empty marker pair (e.g. injected by a Daily Note template) → fill it
+ *   - marker pair with real content → preserve it (existing safety)
+ * Without this, any Daily Note template that pre-seeds the markers would
+ * make past-day backfill a no-op for those notes.
+ */
+export function isMarkerRegionEmpty(
+  content: string,
+  markerStart: string,
+  markerEnd: string,
+): boolean {
+  if (!isMarkerRegionValid(content, markerStart, markerEnd)) return false;
+  const startIdx = content.indexOf(markerStart);
+  const endIdx = content.indexOf(markerEnd, startIdx + markerStart.length);
+  const inner = content.slice(startIdx + markerStart.length, endIdx);
+  return inner.trim().length === 0;
+}
+
+/**
+ * Replace the content between the first valid marker pair with `block`.
+ * Caller MUST have already verified validity via isMarkerRegionValid.
+ *
+ * `block` should include the markers themselves — this function
+ * replaces the FULL region [startIdx, endIdx + markerEnd.length).
+ */
+export function replaceMarkerBlock(
+  content: string,
+  markerStart: string,
+  markerEnd: string,
+  newBlock: string,
+): string {
+  const startIdx = content.indexOf(markerStart);
+  const endIdx = content.indexOf(markerEnd, startIdx + markerStart.length);
+  const before = content.slice(0, startIdx);
+  const after = content.slice(endIdx + markerEnd.length);
+  return before + newBlock + after;
+}
+
+/**
+ * Append `block` to the end of `content`, normalizing trailing
+ * whitespace and ensuring exactly one blank line of separation.
+ * `block` should include the markers themselves.
+ */
+export function appendMarkerBlock(content: string, newBlock: string): string {
+  const trimmed = content.replace(/\s+$/, "");
+  // If content was empty, don't lead with newlines
+  return trimmed.length > 0 ? `${trimmed}\n\n${newBlock}\n` : `${newBlock}\n`;
+}
+
+/**
+ * [0.8.0] Incremental merge — for each new event line, append it inside
+ * the marker region UNLESS some existing line already starts with it.
+ * Existing content (user notes, prior events, user edits) is preserved
+ * byte-for-byte.
+ *
+ * Algorithm:
+ *   1. Extract the inner region between markers.
+ *   2. For each new event line, scan existing lines; if any one starts
+ *      with the new line (i.e. new line is a prefix of that existing
+ *      line, which covers the "user appended text to the rendered line"
+ *      case), skip it.
+ *   3. Append remaining new lines just before the end marker, keeping
+ *      existing content intact.
+ *
+ * Caller MUST have already verified marker validity via
+ * isMarkerRegionValid (same precondition as replaceMarkerBlock). If
+ * markers are missing or inverted this returns content unchanged as a
+ * defensive fallback.
+ *
+ * Trade-offs vs replaceMarkerBlock (the "default" today-mode behaviour):
+ *   + User edits inside the marker region survive every sync.
+ *   - Trakt-side mutations (rating changes, scrobble deletions) won't
+ *     reflect — the old line stays, the new one is appended alongside.
+ *   - Language switches produce side-by-side bilingual content until
+ *     the user clears the region.
+ * The comparison table shown in Settings UI walks the user through
+ * exactly these cases so they pick the right mode for their workflow.
+ */
+export function mergeMarkerBlockIncremental(
+  content: string,
+  markerStart: string,
+  markerEnd: string,
+  newEventLines: string[],
+): string {
+  if (!isMarkerRegionValid(content, markerStart, markerEnd)) {
+    // Defensive: caller should have checked. Return content untouched
+    // rather than crash or write to a malformed region.
+    return content;
+  }
+
+  const startIdx = content.indexOf(markerStart);
+  const endIdx = content.indexOf(markerEnd, startIdx + markerStart.length);
+  const inner = content.slice(startIdx + markerStart.length, endIdx);
+
+  // Split preserving each line as-is (no per-line trimming — user
+  // content matters byte-for-byte, including trailing spaces).
+  const existingLines = inner.split("\n");
+
+  // Which new event lines aren't already covered by an existing line?
+  // "Covered" = some existing line starts with the new line string,
+  // which catches both "exact match" and "user appended notes after
+  // the rendered line".
+  const linesToAppend: string[] = [];
+  for (const newLine of newEventLines) {
+    if (newLine.length === 0) continue; // defensive — shouldn't happen
+    const covered = existingLines.some((existing) =>
+      existing.startsWith(newLine),
+    );
+    if (!covered) linesToAppend.push(newLine);
+  }
+
+  // Nothing to do — preserve the file byte-for-byte. Critical for the
+  // diff-based write layer: if we return a string that compares
+  // unequal due to formatting tweaks, every sync touches the file.
+  if (linesToAppend.length === 0) return content;
+
+  // Strip ONLY trailing newlines/whitespace from inner so we can place
+  // the appended lines flush with the rest, ending with a single \n
+  // before the marker. Leading whitespace inside `inner` stays
+  // untouched (user might have intentional leading blank lines).
+  const innerTrimmedEnd = inner.replace(/[\s\n]+$/, "");
+  const appended = linesToAppend.join("\n");
+  const newInner =
+    innerTrimmedEnd.length === 0
+      ? `\n${appended}\n`
+      : `${innerTrimmedEnd}\n${appended}\n`;
+
+  return (
+    content.slice(0, startIdx + markerStart.length) +
+    newInner +
+    content.slice(endIdx)
+  );
+}
+
+// ── Event aggregation ──
+
+/**
+ * Collect ALL events that fall on `date` (in local timezone) across
+ * the user's enabled sync sources. Returns sorted ascending by
+ * timestamp.
+ */
+export function aggregateEventsForDate(
+  date: string,
+  items: Iterable<NormalizedItem>,
+  settings: TraktrSettings,
+): DailyNoteEvent[] {
+  const events: DailyNoteEvent[] = [];
+
+  for (const item of items) {
+    // 1. Watched events (detailed history)
+    if (settings.syncWatchedDetail) {
+      if (item.type === "movie" && item.watch_history_movie) {
+        for (const ts of item.watch_history_movie) {
+          if (localISODate(ts) === date) {
+            events.push({
+              timestamp: ts,
+              localTime: localHHMM(ts),
+              action: "watched",
+              display: renderDisplay(item),
+            });
+          }
+        }
+      } else if (item.type === "show" && item.watch_history_episodes) {
+        // Group same-timestamp episodes for same show so they comma-merge.
+        // Different timestamps stay as separate events.
+        const bucketByTimestamp = new Map<string, number[]>(); // ts → episode numbers within same season
+        const seasonByTimestamp = new Map<string, number>();
+        for (const ep of item.watch_history_episodes) {
+          for (const ts of ep.watched_at) {
+            if (localISODate(ts) !== date) continue;
+            // Key by timestamp + season (since "S1E16, S2E1" doesn't merge sensibly)
+            const key = `${ts}|${ep.season}`;
+            if (!bucketByTimestamp.has(key)) {
+              bucketByTimestamp.set(key, []);
+              seasonByTimestamp.set(key, ep.season);
+            }
+            bucketByTimestamp.get(key)!.push(ep.episode);
+          }
+        }
+        for (const [key, episodes] of bucketByTimestamp) {
+          const ts = key.split("|")[0];
+          const season = seasonByTimestamp.get(key)!;
+          const sortedEps = [...episodes].sort((a, b) => a - b);
+          events.push({
+            timestamp: ts,
+            localTime: localHHMM(ts),
+            action: "watched",
+            display: renderShowDisplay(item, season, sortedEps),
+          });
+        }
+      }
+    }
+
+    // 2. Watchlist additions
+    if (settings.syncWatchlist && item.watchlist_added_at) {
+      if (localISODate(item.watchlist_added_at) === date) {
+        events.push({
+          timestamp: item.watchlist_added_at,
+          localTime: localHHMM(item.watchlist_added_at),
+          action: "added_to_watchlist",
+          display: renderDisplay(item),
+        });
+      }
+    }
+
+    // 3. Favorites
+    if (settings.syncFavorites && item.favorited_at) {
+      if (localISODate(item.favorited_at) === date) {
+        events.push({
+          timestamp: item.favorited_at,
+          localTime: localHHMM(item.favorited_at),
+          action: "favorited",
+          display: renderDisplay(item),
+        });
+      }
+    }
+
+    // 4. Ratings
+    if (settings.syncRatings && item.rated_at && item.my_rating) {
+      if (localISODate(item.rated_at) === date) {
+        events.push({
+          timestamp: item.rated_at,
+          localTime: localHHMM(item.rated_at),
+          action: "rated",
+          display: renderDisplay(item),
+          ratingValue: item.my_rating,
+        });
+      }
+    }
+  }
+
+  // Sort ascending by raw timestamp string (ISO-8601 sorts correctly
+  // lexicographically when consistent timezone — we use UTC from Trakt).
+  events.sort((a, b) => (a.timestamp < b.timestamp ? -1 : a.timestamp > b.timestamp ? 1 : 0));
+  return events;
+}
+
+function renderDisplay(item: NormalizedItem): string {
+  return `${item.title} (${item.year})`;
+}
+
+function renderShowDisplay(
+  item: NormalizedItem,
+  season: number,
+  episodes: number[],
+): string {
+  const epList = episodes.map((e) => `S${season}E${e}`).join(", ");
+  return `${item.title} (${item.year}) ${epList}`;
+}
+
+// ── Block rendering ──
+
+const VERBS: Record<DailyNoteEventAction, string> = {
+  watched: "watched",
+  added_to_watchlist: "added to watchlist",
+  favorited: "favorited",
+  rated: "rated",
+};
+
+/**
+ * Render the verb (action text) for an event in the given language.
+ * For "rated", appends the rating value like " 9/10".
+ */
+export function renderVerb(
+  action: DailyNoteEventAction,
+  _lang: string,
+  ratingValue?: number,
+): string {
+  const verb = VERBS[action];
+  if (action === "rated" && ratingValue !== undefined) {
+    return `${verb} ${ratingValue}/10`;
+  }
+  return verb;
+}
+
+/** Render one line for an event. Format: "{HH:MM} — {verb} {display}". */
+export function renderEntry(event: DailyNoteEvent, lang: string): string {
+  const verb = renderVerb(event.action, lang, event.ratingValue);
+  return `${event.localTime} — ${verb} ${event.display}`;
+}
+
+/**
+ * Render the full marker block for a date's events. Empty events
+ * still produce a block with just the markers (so today can have
+ * empty markers ready for events to land later).
+ */
+export function renderMarkerBlock(
+  events: DailyNoteEvent[],
+  markerStart: string,
+  markerEnd: string,
+  lang: string,
+): string {
+  if (events.length === 0) {
+    return `${markerStart}\n${markerEnd}`;
+  }
+  const lines = events.map((e) => renderEntry(e, lang)).join("\n");
+  return `${markerStart}\n${lines}\n${markerEnd}`;
+}
+
+// ── Catch-up loop ──
+
+export interface DateProcessResult {
+  status:
+    | "skipped_no_file"
+    | "skipped_has_markers"
+    | "wrote_new"
+    | "overwrote"
+    | "unchanged";
+}
+
+/** All the dependencies the catch-up algorithm needs from the host (Plugin). */
+export interface DailyNotesHost {
+  app: App;
+  settings: TraktrSettings;
+  saveSettings: () => Promise<void>;
+  /** Returns the merged item map used in the most recent sync, for event aggregation. */
+  getMergedItems: () => Iterable<NormalizedItem>;
+}
+
+/**
+ * Catch-up algorithm: always process today (overwrite mode), then walk
+ * past days (add-only). Advances `lastDailyNoteSyncedAt` at the end.
+ * See spec 0006 §"Catch-up algorithm".
+ */
+export async function processCatchUp(host: DailyNotesHost): Promise<{
+  todayMode: DateProcessResult["status"];
+  pastWrote: number;
+  pastSkipped: number;
+}> {
+  const today = localTodayISODate();
+  const last = host.settings.historyState.lastDailyNoteSyncedAt || "";
+
+  // 1. Today — always overwrite. Happens regardless of cursor.
+  const todayResult = await processDate(host, today, "today");
+
+  // 2. Past days — add-only. Walk last+1 through today-1.
+  let pastWrote = 0;
+  let pastSkipped = 0;
+  if (last && last < today) {
+    let cursor = addDaysISO(last, 1);
+    if (daysBetweenISO(cursor, today) > SAFETY_CAP_DAYS) {
+      console.warn(
+        `[Traktr] Daily catch-up gap > ${SAFETY_CAP_DAYS} days; clipping`,
+      );
+      cursor = addDaysISO(today, -SAFETY_CAP_DAYS);
+    }
+    while (cursor < today) {
+      const result = await processDate(host, cursor, "past");
+      if (result.status === "wrote_new") pastWrote++;
+      else pastSkipped++;
+      cursor = addDaysISO(cursor, 1);
+    }
+  }
+
+  // 3. Advance cursor to today (only after successful processing — if
+  //    processDate threw, we'd skip this assignment).
+  host.settings.historyState.lastDailyNoteSyncedAt = today;
+  await host.saveSettings();
+
+  return { todayMode: todayResult.status, pastWrote, pastSkipped };
+}
+
+/**
+ * Process ONE date. `mode` selects the write policy:
+ *   "today" → always overwrite within markers (or insert markers if absent)
+ *   "past"  → add-only: skip if markers present
+ *
+ * Always silent on missing file (returns "skipped_no_file"). Caller
+ * decides how to surface results to the user.
+ */
+export async function processDate(
+  host: DailyNotesHost,
+  date: string,
+  mode: "today" | "past",
+): Promise<DateProcessResult> {
+  const { app, settings } = host;
+  const moment = (window as unknown as { moment: (i: string, f: string) => { format(o: string): string } })
+    .moment;
+  const path = computeDailyNotePath(
+    date,
+    settings.dailyNotesFolder,
+    settings.dailyNotesFilenameFormat,
+    moment,
+  );
+  const abstractFile = app.vault.getAbstractFileByPath(path);
+  if (!abstractFile || !(abstractFile instanceof TFile)) {
+    return { status: "skipped_no_file" };
+  }
+  const file: TFile = abstractFile;
+
+  const content = await app.vault.read(file);
+  const hasMarkers = isMarkerRegionValid(
+    content,
+    settings.dailyNotesMarkerStart,
+    settings.dailyNotesMarkerEnd,
+  );
+
+  if (mode === "past") {
+    // [0.7.2] Empty marker pair (e.g. injected by a Daily Note template)
+    // should be filled, not skipped. Only skip when the region already
+    // has real content — that's what the safety contract protects.
+    if (
+      hasMarkers &&
+      !isMarkerRegionEmpty(
+        content,
+        settings.dailyNotesMarkerStart,
+        settings.dailyNotesMarkerEnd,
+      )
+    ) {
+      return { status: "skipped_has_markers" };
+    }
+    const events = aggregateEventsForDate(date, host.getMergedItems(), settings);
+    if (events.length === 0) return { status: "skipped_no_file" };
+    const lang = getEffectiveTemplateLanguage(settings);
+    const block = renderMarkerBlock(
+      events,
+      settings.dailyNotesMarkerStart,
+      settings.dailyNotesMarkerEnd,
+      lang,
+    );
+    if (hasMarkers) {
+      // Empty region present — replace in place so we don't end up with
+      // a duplicate marker pair below the original.
+      const next = replaceMarkerBlock(
+        content,
+        settings.dailyNotesMarkerStart,
+        settings.dailyNotesMarkerEnd,
+        block,
+      );
+      if (next === content) return { status: "unchanged" };
+      await app.vault.process(file, (old) =>
+        replaceMarkerBlock(
+          old,
+          settings.dailyNotesMarkerStart,
+          settings.dailyNotesMarkerEnd,
+          block,
+        ),
+      );
+    } else {
+      const next = appendMarkerBlock(content, block);
+      if (next === content) return { status: "unchanged" };
+      await app.vault.process(file, (old) => appendMarkerBlock(old, block));
+    }
+    return { status: "wrote_new" };
+  }
+
+  // mode === "today"
+  const events = aggregateEventsForDate(date, host.getMergedItems(), settings);
+  if (events.length === 0 && !hasMarkers) {
+    // Nothing to write and no existing region to refresh; do nothing.
+    return { status: "skipped_no_file" };
+  }
+  const lang = getEffectiveTemplateLanguage(settings);
+  const syncMode = settings.dailyNotesSyncMode ?? "default";
+
+  // [0.8.0] "incremental" mode: only append new event lines that aren't
+  // already covered by an existing line. Preserves user edits inside the
+  // marker region byte-for-byte. Trade-off documented in the settings
+  // comparison table. Falls back to "default" (full replace) for unknown
+  // mode values (defensive against future setting additions).
+  if (hasMarkers && syncMode === "incremental") {
+    const newEventLines = events.map((e) => renderEntry(e, lang));
+    if (newEventLines.length === 0) {
+      // Nothing to add — preserve the file byte-for-byte. Without this
+      // check we'd still go through vault.process and the diff layer
+      // would touch the file unnecessarily.
+      return { status: "unchanged" };
+    }
+    const next = mergeMarkerBlockIncremental(
+      content,
+      settings.dailyNotesMarkerStart,
+      settings.dailyNotesMarkerEnd,
+      newEventLines,
+    );
+    if (next === content) return { status: "unchanged" };
+    await app.vault.process(file, (old) =>
+      mergeMarkerBlockIncremental(
+        old,
+        settings.dailyNotesMarkerStart,
+        settings.dailyNotesMarkerEnd,
+        newEventLines,
+      ),
+    );
+    return { status: "overwrote" };
+  }
+
+  const block = renderMarkerBlock(
+    events,
+    settings.dailyNotesMarkerStart,
+    settings.dailyNotesMarkerEnd,
+    lang,
+  );
+  if (hasMarkers) {
+    const next = replaceMarkerBlock(
+      content,
+      settings.dailyNotesMarkerStart,
+      settings.dailyNotesMarkerEnd,
+      block,
+    );
+    if (next === content) return { status: "unchanged" };
+    await app.vault.process(file, (old) =>
+      replaceMarkerBlock(
+        old,
+        settings.dailyNotesMarkerStart,
+        settings.dailyNotesMarkerEnd,
+        block,
+      ),
+    );
+    return { status: "overwrote" };
+  } else {
+    const next = appendMarkerBlock(content, block);
+    if (next === content) return { status: "unchanged" };
+    await app.vault.process(file, (old) => appendMarkerBlock(old, block));
+    return { status: "wrote_new" };
+  }
+}
+
+/**
+ * Manual backfill — walks each day in [fromDateISO, toDateISO] inclusive.
+ *
+ * [1.0.0] Signature changed from `(host, days)` to `(host, fromDateISO,
+ * toDateISO)` so the settings UI can offer a real date-range picker
+ * instead of "last N days". Days are processed in their per-day mode:
+ * `cursor === today` → overwrite (today mode); anything else → add-only
+ * (past mode, preserves existing marker content).
+ *
+ * Defensive handling:
+ *   - end < start → returns { wrote: 0, skipped: 0 } immediately
+ *   - end > today → clamped to today (no point processing the future)
+ *   - range longer than 3650 days (10 years) → clamped from the end,
+ *     so the user gets the most recent 10 years if they ask for absurd
+ *     ranges. Same ceiling we had on the old days-based API.
+ *
+ * Advances `lastDailyNoteSyncedAt` to today on completion (the auto
+ * catch-up cursor — manual backfill shouldn't leave the catch-up
+ * thinking it needs to re-walk days it just processed).
+ */
+const MANUAL_BACKFILL_MAX_DAYS = 3650;
+
+export async function manualBackfill(
+  host: DailyNotesHost,
+  fromDateISO: string,
+  toDateISO: string,
+): Promise<{ wrote: number; skipped: number }> {
+  const today = localTodayISODate();
+
+  let from = fromDateISO;
+  let to = toDateISO;
+
+  // Clamp end to today — processing the future doesn't make sense and
+  // the per-day code path would just hit "skipped_no_file" anyway.
+  if (to > today) to = today;
+
+  // Inverted range → no-op. Caller should disable the confirm button
+  // before reaching here, but be safe.
+  if (from > to) return { wrote: 0, skipped: 0 };
+
+  // Cap excessive ranges from the start side (keep the most recent slice).
+  if (daysBetweenISO(from, to) >= MANUAL_BACKFILL_MAX_DAYS) {
+    from = addDaysISO(to, -(MANUAL_BACKFILL_MAX_DAYS - 1));
+  }
+
+  let cursor = from;
+  let wrote = 0;
+  let skipped = 0;
+
+  while (cursor <= to) {
+    const mode = cursor === today ? "today" : "past";
+    const result = await processDate(host, cursor, mode);
+    if (result.status === "wrote_new" || result.status === "overwrote") {
+      wrote++;
+    } else {
+      skipped++;
+    }
+    cursor = addDaysISO(cursor, 1);
+  }
+
+  host.settings.historyState.lastDailyNoteSyncedAt = today;
+  await host.saveSettings();
+
+  return { wrote, skipped };
+}
+
+/**
+ * Render 3 hardcoded example events for the settings-page live preview.
+ *
+ * Uses the same English rendering as actual Daily Notes.
+ */
+export function renderPreview(settings: TraktrSettings): string {
+  const lang = getEffectiveTemplateLanguage(settings);
+  const examples: DailyNoteEvent[] = [
+    {
+      timestamp: "2026-05-11T10:00:00Z",
+      localTime: "10:00",
+      action: "watched",
+      display: "Breaking Bad (2008) S1E1, S1E2",
+    },
+    {
+      timestamp: "2026-05-11T14:30:00Z",
+      localTime: "14:30",
+      action: "added_to_watchlist",
+      display: "Inception (2010)",
+    },
+    {
+      timestamp: "2026-05-11T21:30:00Z",
+      localTime: "21:30",
+      action: "rated",
+      display: "The Dark Knight (2008)",
+      ratingValue: 9,
+    },
+  ];
+  return examples.map((e) => renderEntry(e, lang)).join("\n");
+}

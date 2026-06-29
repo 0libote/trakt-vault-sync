@@ -1,0 +1,36 @@
+{
+  "name": "trakt-vault-sync",
+  "version": "1.3.0",
+  "description": "Sync Trakt watchlists, history, favorites, and ratings into Obsidian notes.",
+  "main": "main.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oliverheyburn/Trakt-Obsidian-Sync.git"
+  },
+  "homepage": "https://github.com/oliverheyburn/Trakt-Obsidian-Sync",
+  "bugs": "https://github.com/oliverheyburn/Trakt-Obsidian-Sync/issues",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "lint": "eslint src/",
+    "test": "esbuild tests/smoke.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/stub-obsidian.ts --outfile=tests/.smoke.cjs --log-level=warning && node tests/.smoke.cjs"
+  },
+  "keywords": [
+    "obsidian",
+    "trakt",
+    "obsidian-plugin",
+    "sync",
+    "watchlist"
+  ],
+  "author": "0libots",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^25.3.5",
+    "@typescript-eslint/parser": "^8.56.1",
+    "esbuild": "0.27.3",
+    "eslint": "^9",
+    "eslint-plugin-obsidianmd": "^0.1.9",
+    "obsidian": "latest",
+    "typescript": "5.9.3"
+  }
+}

@@ -1,0 +1,344 @@
+.traktr-auth-modal {
+  max-width: 400px;
+}
+
+.traktr-auth-modal h2 {
+  margin-bottom: 1em;
+}
+
+.traktr-auth-status {
+  color: var(--text-muted);
+  margin-bottom: 0.5em;
+}
+
+.traktr-auth-code-container {
+  text-align: center;
+  margin: 1.5em 0;
+}
+
+.traktr-auth-code {
+  display: inline-block;
+  font-size: 2em;
+  font-weight: bold;
+  letter-spacing: 0.15em;
+  padding: 0.4em 0.8em;
+  background: var(--background-secondary);
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: all;
+  transition: background 0.15s ease;
+}
+
+.traktr-auth-code:hover {
+  background: var(--background-modifier-hover);
+}
+
+.traktr-auth-copy-hint {
+  display: block;
+  margin-top: 0.3em;
+  color: var(--text-faint);
+  font-size: 0.85em;
+}
+
+.traktr-auth-countdown {
+  color: var(--text-muted);
+  font-size: 0.9em;
+  margin-bottom: 1em;
+}
+
+/* [0.6.0] Settings page tab navigation — see spec 0005. */
+.trakt-tab-bar {
+  display: flex;
+  gap: 0.25em;
+  margin-bottom: 1em;
+  border-bottom: 1px solid var(--background-modifier-border);
+  flex-wrap: wrap;
+}
+
+.trakt-tab {
+  padding: 0.5em 1em;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 1em;
+  border-radius: 0;
+}
+
+.trakt-tab:hover {
+  color: var(--text-normal);
+}
+
+.trakt-tab.is-active {
+  color: var(--text-normal);
+  border-bottom-color: var(--interactive-accent);
+}
+
+.trakt-daily-placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 2em 0;
+}
+
+/* [0.7.0] Daily Notes settings tab — warning banner, preview, sources */
+.trakt-daily-warning {
+  margin: 0.25em 0 1.25em 0;
+  padding: 0.45em 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-warning, var(--color-orange));
+  font-size: 0.88em;
+  line-height: 1.45;
+  border: none;
+}
+
+.trakt-daily-preview {
+  margin: 0.5em 0 1.5em 0;
+  padding: 0.75em 1em;
+  background: var(--background-secondary);
+  border-radius: 4px;
+  font-family: var(--font-monospace);
+  font-size: 0.9em;
+  white-space: pre-wrap;
+  color: var(--text-normal);
+}
+
+.trakt-daily-sources {
+  margin: 0.5em 0 1em 0;
+  padding-left: 0.5em;
+  color: var(--text-muted);
+  font-size: 0.9em;
+  line-height: 1.6;
+}
+
+.trakt-modal-buttons {
+  margin-top: 1.5em;
+  display: flex;
+  gap: 0.5em;
+  justify-content: flex-end;
+}
+
+.trakt-modal-buttons button {
+  padding: 0.5em 1em;
+}
+
+.trakt-confirm-body {
+  margin: 0.5em 0 0;
+}
+
+.trakt-confirm-body p {
+  margin: 0.5em 0;
+  color: var(--text-normal);
+  line-height: 1.5;
+}
+
+/* [0.3.2] TMDB key Test button result line + missing-key warning banner. */
+.trakt-test-result {
+  margin-top: 0.5em;
+  font-size: 0.9em;
+}
+
+.trakt-test-result.is-ok {
+  color: var(--color-green);
+}
+
+.trakt-test-result.is-error {
+  color: var(--color-red);
+}
+
+.trakt-test-result.is-muted {
+  color: var(--text-muted);
+}
+
+.trakt-tmdb-warning {
+  margin-top: -0.5em;
+  margin-bottom: 1em;
+  padding: 0.6em 0.8em;
+  border-radius: 4px;
+  background: var(--background-modifier-error-hover);
+  color: var(--text-normal);
+  font-size: 0.9em;
+}
+
+/* [1.0.0] Backfill range modal — preset row + stats. */
+.trakt-backfill-presets {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  flex-wrap: wrap;
+  margin: 0.25em 0 1em 0;
+}
+
+.trakt-backfill-preset-label {
+  color: var(--text-muted);
+  font-size: 0.9em;
+  margin-right: 0.25em;
+}
+
+.trakt-backfill-preset-btn {
+  padding: 0.25em 0.7em;
+  font-size: 0.9em;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-normal);
+}
+
+.trakt-backfill-preset-btn:hover {
+  background: var(--background-modifier-hover);
+}
+
+.trakt-backfill-stat {
+  margin: 0.25em 0;
+  color: var(--text-normal);
+  font-size: 0.95em;
+}
+
+.trakt-backfill-invalid {
+  margin: 0.25em 0;
+  color: var(--text-error, var(--color-red));
+  font-size: 0.9em;
+}
+
+.trakt-backfill-body {
+  margin: 0.4em 0;
+  color: var(--text-muted);
+  font-size: 0.88em;
+  line-height: 1.5;
+}
+
+/* [1.0.0] What's-new modal — release-log list + footer. */
+.trakt-whatsnew-list {
+  margin: 0.5em 0 1em 1.5em;
+  padding: 0;
+  list-style: disc;
+}
+
+.trakt-whatsnew-list li {
+  margin: 0.45em 0;
+  line-height: 1.5;
+}
+
+.trakt-whatsnew-list li strong {
+  font-weight: 600;
+}
+
+.trakt-whatsnew-footer {
+  margin-top: 1em;
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+
+/* [0.8.0] Daily Notes sync mode — comparison table. */
+.trakt-sync-mode-table {
+  width: 100%;
+  margin: 0.75em 0 1.25em 0;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.trakt-sync-mode-table th,
+.trakt-sync-mode-table td {
+  text-align: left;
+  padding: 0.45em 0.7em;
+  border-bottom: 1px solid var(--background-modifier-border);
+  vertical-align: top;
+}
+
+.trakt-sync-mode-table th {
+  font-weight: 600;
+  color: var(--text-normal);
+  background: var(--background-secondary);
+}
+
+.trakt-sync-mode-table td:first-child {
+  color: var(--text-muted);
+}
+
+/* [1.3.0] Per-Base field chooser. */
+.trakt-bases-field-panel {
+  margin: 0.75em 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+  overflow: hidden;
+}
+
+.trakt-bases-field-panel > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1em;
+  padding: 0.8em 1em;
+  cursor: pointer;
+  color: var(--text-normal);
+  font-weight: var(--font-semibold);
+}
+
+.trakt-bases-field-panel[open] > summary {
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.trakt-bases-field-count {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-normal);
+  white-space: nowrap;
+}
+
+.trakt-bases-field-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  padding: 0.85em 1em 0.25em;
+}
+
+.trakt-bases-field-controls button {
+  font-size: var(--font-ui-smaller);
+}
+
+.trakt-bases-field-section {
+  padding: 0.65em 1em 0.9em;
+}
+
+.trakt-bases-field-section + .trakt-bases-field-section {
+  border-top: 1px solid var(--background-modifier-border-hover);
+}
+
+.trakt-bases-field-section-title {
+  margin-bottom: 0.55em;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-semibold);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.trakt-bases-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.4em 1em;
+}
+
+.trakt-bases-field-option {
+  display: flex;
+  align-items: center;
+  gap: 0.55em;
+  min-width: 0;
+  padding: 0.2em 0;
+  color: var(--text-normal);
+  cursor: pointer;
+}
+
+.trakt-bases-field-option input {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+@media (max-width: 500px) {
+  .trakt-bases-field-grid {
+    grid-template-columns: 1fr;
+  }
+}
