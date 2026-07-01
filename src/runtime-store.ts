@@ -92,9 +92,25 @@ function idbError(error: unknown, fallback: string): Error {
   return error instanceof Error ? error : new Error(fallback);
 }
 
+function getIndexedDb(): IDBFactory | undefined {
+  if (typeof activeWindow !== "undefined") {
+    return activeWindow.indexedDB;
+  }
+  if (typeof window !== "undefined") {
+    return window.indexedDB;
+  }
+  return undefined;
+}
+
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = globalThis.indexedDB.open(RUNTIME_DB_NAME, 1);
+    const indexedDb = getIndexedDb();
+    if (!indexedDb) {
+      reject(new Error("IndexedDB is not available"));
+      return;
+    }
+
+    const request = indexedDb.open(RUNTIME_DB_NAME, 1);
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains(RUNTIME_STORE_NAME)) {
         request.result.createObjectStore(RUNTIME_STORE_NAME);
@@ -162,7 +178,7 @@ export class RuntimeStore {
   ) {}
 
   async load(): Promise<RuntimeStoragePayload | null> {
-    if (typeof globalThis.indexedDB !== "undefined") {
+    if (getIndexedDb()) {
       try {
         const value = await idbRead(this.key);
         if (isRuntimeStoragePayload(value)) {
@@ -178,7 +194,7 @@ export class RuntimeStore {
   }
 
   async save(payload: RuntimeStoragePayload): Promise<void> {
-    if (typeof globalThis.indexedDB !== "undefined") {
+    if (getIndexedDb()) {
       try {
         await idbWrite(this.key, payload);
         return;
@@ -190,7 +206,7 @@ export class RuntimeStore {
   }
 
   async clear(): Promise<void> {
-    if (typeof globalThis.indexedDB !== "undefined") {
+    if (getIndexedDb()) {
       try {
         await idbDelete(this.key);
       } catch (error) {
