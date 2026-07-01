@@ -466,7 +466,7 @@ export class TraktrSettingTab extends PluginSettingTab {
       btn.onclick = () => {
         this.activeTab = tabId;
         this.plugin.app.saveLocalStorage(ACTIVE_TAB_STORAGE_KEY, tabId);
-        this.display();
+        this.render();
       };
     }
   }
@@ -499,7 +499,7 @@ export class TraktrSettingTab extends PluginSettingTab {
         )
         .onClick(async () => {
           await this.plugin.setKeyIsLocal(key, !isLocal);
-          this.display();
+          this.render();
         });
     });
   }
@@ -817,7 +817,7 @@ export class TraktrSettingTab extends PluginSettingTab {
             this.plugin.settings.dailyNotesEnabled = value;
             await this.plugin.saveSettings();
             this.plugin.configureDailyNotesAutoSync();
-            this.display();
+            this.render();
           }),
       );
 
@@ -919,7 +919,7 @@ export class TraktrSettingTab extends PluginSettingTab {
               this.plugin.settings.dailyNotesAutoSyncEnabled = value;
               await this.plugin.saveSettings();
               this.plugin.configureDailyNotesAutoSync();
-              this.display();
+              this.render();
             }),
         ),
       "dailyNotesAutoSyncEnabled",
@@ -934,7 +934,6 @@ export class TraktrSettingTab extends PluginSettingTab {
             slider
               .setLimits(5, 360, 5)
               .setValue(this.plugin.settings.dailyNotesAutoSyncIntervalMinutes)
-              .setDynamicTooltip()
               .onChange(async (value) => {
                 this.plugin.settings.dailyNotesAutoSyncIntervalMinutes = value;
                 await this.plugin.saveSettings();
@@ -1068,6 +1067,10 @@ export class TraktrSettingTab extends PluginSettingTab {
   }
 
   display(): void {
+    this.render();
+  }
+
+  private render(): void {
     const { containerEl } = this;
     containerEl.empty();
     const t = getTranslator();
@@ -1137,7 +1140,7 @@ export class TraktrSettingTab extends PluginSettingTab {
       connectionSetting.addButton((btn) =>
         btn
           .setButtonText(t("auth.connection.disconnect"))
-          .setWarning()
+          .setDestructive()
           .onClick(async () => {
             const confirmed = await this.confirmAction({
               title: "confirm.disconnect.title",
@@ -1152,7 +1155,7 @@ export class TraktrSettingTab extends PluginSettingTab {
             this.plugin.configureAutoSync();
             this.plugin.configureDailyNotesAutoSync();
             new Notice(t("auth.connection.disconnectedNotice"));
-            this.display();
+            this.render();
           }),
       );
     } else {
@@ -1170,7 +1173,7 @@ export class TraktrSettingTab extends PluginSettingTab {
               return;
             }
             this.plugin.startAuth();
-            this.display();
+            this.render();
           }),
       );
     }
@@ -1287,7 +1290,7 @@ export class TraktrSettingTab extends PluginSettingTab {
       .addButton((btn) =>
         btn
           .setButtonText(t("tmdb.cache.clear.button"))
-          .setWarning()
+          .setDestructive()
           .onClick(async () => {
             const confirmed = await this.confirmAction({
               title: "confirm.clearTmdb.title",
@@ -1298,7 +1301,7 @@ export class TraktrSettingTab extends PluginSettingTab {
             clearTmdbCache(this.plugin.settings.tmdbCache);
             await this.plugin.saveSettings();
             new Notice(t("tmdb.cache.clear.notice"));
-            this.display();
+            this.render();
           }),
       );
 
@@ -1367,7 +1370,7 @@ export class TraktrSettingTab extends PluginSettingTab {
       btn.setButtonText(t("templates.reset")).onClick(async () => {
         this.plugin.settings.movieNoteTemplate = DEFAULT_MOVIE_TEMPLATE;
         await this.plugin.saveSettings();
-        this.display();
+        this.render();
       }),
     );
 
@@ -1388,7 +1391,7 @@ export class TraktrSettingTab extends PluginSettingTab {
       btn.setButtonText(t("templates.reset")).onClick(async () => {
         this.plugin.settings.showNoteTemplate = DEFAULT_SHOW_TEMPLATE;
         await this.plugin.saveSettings();
-        this.display();
+        this.render();
       }),
     );
 
@@ -1506,7 +1509,7 @@ export class TraktrSettingTab extends PluginSettingTab {
             // avoids surprise behavior next time syncWatched is re-enabled.
             if (!value) this.plugin.settings.syncWatchedDetail = false;
             await this.plugin.saveSettings();
-            this.display();
+            this.render();
           }),
       );
 
@@ -1520,7 +1523,7 @@ export class TraktrSettingTab extends PluginSettingTab {
             .onChange(async (value) => {
               this.plugin.settings.syncWatchedDetail = value;
               await this.plugin.saveSettings();
-              this.display();
+              this.render();
             }),
         );
 
@@ -1546,7 +1549,6 @@ export class TraktrSettingTab extends PluginSettingTab {
             slider
               .setLimits(1, 30, 1)
               .setValue(this.plugin.settings.historyFullRefreshIntervalDays)
-              .setDynamicTooltip()
               .onChange(async (value) => {
                 this.plugin.settings.historyFullRefreshIntervalDays = value;
                 await this.plugin.saveSettings();
@@ -1559,7 +1561,7 @@ export class TraktrSettingTab extends PluginSettingTab {
           .addButton((btn) =>
             btn
               .setButtonText(t("history.state.clear.button"))
-              .setWarning()
+              .setDestructive()
               .onClick(async () => {
                 const confirmed = await this.confirmAction({
                   title: "confirm.clearHistory.title",
@@ -1570,7 +1572,7 @@ export class TraktrSettingTab extends PluginSettingTab {
                 clearHistoryState(this.plugin.settings.historyState);
                 await this.plugin.saveSettings();
                 new Notice(t("history.state.clear.notice"));
-                this.display();
+                this.render();
               }),
           );
       }
@@ -1641,7 +1643,7 @@ export class TraktrSettingTab extends PluginSettingTab {
               this.plugin.settings.autoSyncEnabled = value;
               await this.plugin.saveSettings();
               this.plugin.configureAutoSync();
-              this.display();
+              this.render();
             }),
         ),
       "autoSyncEnabled",
@@ -1656,7 +1658,6 @@ export class TraktrSettingTab extends PluginSettingTab {
             slider
               .setLimits(5, 360, 5)
               .setValue(this.plugin.settings.autoSyncIntervalMinutes)
-              .setDynamicTooltip()
               .onChange(async (value) => {
                 this.plugin.settings.autoSyncIntervalMinutes = value;
                 await this.plugin.saveSettings();
@@ -1682,7 +1683,7 @@ export class TraktrSettingTab extends PluginSettingTab {
             this.plugin.settings.communityStatsUpdatePolicy =
               value as CommunityStatsUpdatePolicy;
             await this.plugin.saveSettings();
-            this.display();
+            this.render();
           }),
       );
 
@@ -1694,7 +1695,6 @@ export class TraktrSettingTab extends PluginSettingTab {
           slider
             .setLimits(1, 30, 1)
             .setValue(this.plugin.settings.communityStatsRefreshIntervalDays)
-            .setDynamicTooltip()
             .onChange(async (value) => {
               this.plugin.settings.communityStatsRefreshIntervalDays = value;
               await this.plugin.saveSettings();
@@ -1725,7 +1725,6 @@ export class TraktrSettingTab extends PluginSettingTab {
             .setValue(
               this.plugin.settings.communityVotesChangeThresholdPercent,
             )
-            .setDynamicTooltip()
             .onChange(async (value) => {
               this.plugin.settings.communityVotesChangeThresholdPercent =
                 value;
@@ -1767,7 +1766,7 @@ export class TraktrSettingTab extends PluginSettingTab {
       .addButton((btn) =>
         btn
           .setButtonText(t("syncMaintenance.dedupe.button"))
-          .setWarning()
+          .setDestructive()
           .onClick(async () => {
             const tNow = getTranslator();
             const confirmed = await this.confirmAction({
@@ -1798,7 +1797,7 @@ export class TraktrSettingTab extends PluginSettingTab {
                 new Notice(`${tNow("status.prefix")}${result.errors[0]}`, 10000);
               }
             } finally {
-              this.display();
+              this.render();
             }
           }),
       );
@@ -1815,7 +1814,7 @@ export class TraktrSettingTab extends PluginSettingTab {
       .addButton((btn) =>
         btn
           .setButtonText(t("reset.button.name"))
-          .setWarning()
+          .setDestructive()
           .onClick(async () => {
             const confirmed = await this.confirmAction({
               title: "confirm.reset.title",
@@ -1844,7 +1843,7 @@ export class TraktrSettingTab extends PluginSettingTab {
             this.plugin.configureAutoSync();
             this.plugin.configureDailyNotesAutoSync();
             new Notice(t("reset.notice"));
-            this.display();
+            this.render();
           }),
       );
     }  // end of "general" tab — second half (Reset)

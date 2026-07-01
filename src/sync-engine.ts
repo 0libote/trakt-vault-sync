@@ -1275,9 +1275,7 @@ export class SyncEngine {
           // fresh file Obsidian hasn't indexed yet, or malformed YAML),
           // we conservatively treat that as "definitely write".
           const cached = this.app.metadataCache.getFileCache(existingFile);
-          const existingFm = cached?.frontmatter as
-            | Record<string, unknown>
-            | undefined;
+          const existingFm = cached?.frontmatter;
           let policyExistingFm = existingFm;
           if (
             !policyExistingFm &&
