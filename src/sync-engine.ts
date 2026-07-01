@@ -41,7 +41,6 @@ import {
 } from "./utils";
 import {
   applyHistoryStateToItems,
-  getIncrementalStartAt,
   mergeHistoryEvents,
   replaceFromFullRefresh,
   shouldRunFullRefresh,
@@ -279,109 +278,6 @@ export async function maybeRenameExistingFile(
   }
 }
 
-/**
- * [1.0.0 / spec 0009] Standalone "Rename now" action — walks every note in
- * the sync folder that has a `trakt_id` in its frontmatter, recomputes the
- * desired filename from the current item title (read from frontmatter) +
- * template, and renames if different.
- *
- * Used by:
- *   - the Settings → Localization "Rename now" button (manual trigger)
- *   - the post-1.0-upgrade modal's "I'll do it now" flow (not yet wired)
- *
- * Does NOT need the full sync engine — operates purely on the on-disk
- * notes' current frontmatter. Returns `{ renamed, scanned }` so the UI can
- * show a result count.
- *
- * Unlike the sync-time rename, this path doesn't have a `NormalizedItem`
- * — instead it builds a minimal one from the existing frontmatter so
- * `disambiguatedFilename` can compute the desired path. The minimal item
- * preserves the same fields the filename template references
- * (`{{title}}`, `{{original_title}}`, `{{year}}`, etc.). Anything else the
- * template might reference isn't available here — those template variables
- * render as empty strings, same as they would on a sync-time rename for an
- * item with sparse data.
- */
-export async function renameAllNotes(
-  app: App,
-  folderPath: string,
-  template: string,
-  propertyPrefix: string,
-): Promise<{ renamed: number; scanned: number }> {
-  const folder = app.vault.getAbstractFileByPath(folderPath);
-  if (!(folder instanceof TFolder)) return { renamed: 0, scanned: 0 };
-
-  let renamed = 0;
-  let scanned = 0;
-
-  for (const child of folder.children) {
-    if (!(child instanceof TFile) || child.extension !== "md") continue;
-    const content = await app.vault.cachedRead(child);
-    const { frontmatter } = parseFrontmatter(content);
-    const synthItem = itemFromFrontmatter(frontmatter, propertyPrefix);
-    if (!synthItem) continue;
-    scanned++;
-
-    const didRename = await maybeRenameExistingFile(
-      app,
-      child,
-      synthItem,
-      folderPath,
-      template,
-    );
-    if (didRename) renamed++;
-  }
-
-  return { renamed, scanned };
-}
-
-function itemFromFrontmatter(
-  frontmatter: Record<string, string>,
-  propertyPrefix: string,
-): NormalizedItem | null {
-  const idKey = `${propertyPrefix}id`;
-  const typeKey = `${propertyPrefix}type`;
-  const titleKey = `${propertyPrefix}title`;
-  const originalTitleKey = `${propertyPrefix}original_title`;
-  const yearKey = `${propertyPrefix}year`;
-  const slugKey = `${propertyPrefix}slug`;
-  const imdbKey = `${propertyPrefix}imdb_id`;
-  const tmdbKey = `${propertyPrefix}tmdb_id`;
-
-  const traktId = parseInt(frontmatter[idKey], 10);
-  const type = frontmatter[typeKey];
-  if (isNaN(traktId)) return null;
-  if (type !== "movie" && type !== "show") return null;
-
-  const tmdbId = parseInt(frontmatter[tmdbKey], 10);
-
-  // Build a minimal NormalizedItem just for filename rendering.
-  // Properties not consulted by the template are left as empty defaults.
-  return {
-    type,
-    title: frontmatter[titleKey] || "",
-    originalTitle: frontmatter[originalTitleKey] || "",
-    year: parseInt(frontmatter[yearKey], 10) || 0,
-    ids: {
-      trakt: traktId,
-      slug: frontmatter[slugKey] || "",
-      imdb: frontmatter[imdbKey] || "",
-      tmdb: isNaN(tmdbId) ? 0 : tmdbId,
-    },
-    overview: "",
-    genres: [],
-    runtime: 0,
-    rating: 0,
-    votes: 0,
-    certification: "",
-    country: "",
-    language: "",
-    status: "",
-    originalOverview: "",
-    originalGenres: [],
-  } as unknown as NormalizedItem;
-}
-
 type NoteIdentityRecord = {
   file: TFile;
   item: NormalizedItem;
@@ -396,6 +292,40 @@ export type DedupeDuplicateNotesResult = {
   failed: number;
   errors: string[];
 };
+
+function itemFromFrontmatter(
+  frontmatter: Record<string, string>,
+  propertyPrefix: string,
+): NormalizedItem | null {
+  const value = (key: string) => frontmatter[`${propertyPrefix}${key}`];
+  const traktId = parseInt(value("id"), 10);
+  const type = value("type");
+  if (isNaN(traktId) || (type !== "movie" && type !== "show")) return null;
+
+  return {
+    type,
+    title: value("title") || "",
+    originalTitle: value("original_title") || "",
+    year: parseInt(value("year"), 10) || 0,
+    ids: {
+      trakt: traktId,
+      slug: value("slug") || "",
+      imdb: value("imdb_id") || "",
+      tmdb: parseInt(value("tmdb_id"), 10) || 0,
+    },
+    overview: "",
+    genres: [],
+    runtime: 0,
+    rating: 0,
+    votes: 0,
+    certification: "",
+    country: "",
+    language: "",
+    status: "",
+    originalOverview: "",
+    originalGenres: [],
+  } as unknown as NormalizedItem;
+}
 
 function syncedAtMs(frontmatter: Record<string, string>, propertyPrefix: string): number {
   const raw = frontmatter[`${propertyPrefix}synced_at`];
@@ -687,7 +617,7 @@ export class SyncEngine {
     onProgress?: SyncProgress,
     options: { forceFullHistoryRefresh?: boolean } = {},
   ): Promise<SyncResult> {
-    const t = getTranslator(this.settings.uiLanguage);
+    const t = getTranslator();
     if (this.syncing) {
       new Notice(t("notice.alreadySyncing"));
       return { added: 0, updated: 0, unchanged: 0, removed: 0, renamed: 0, failed: 0, errors: [] };
@@ -816,7 +746,7 @@ export class SyncEngine {
     onProgress?: SyncProgress,
     options: { suppressAlreadyRunningNotice?: boolean } = {},
   ): Promise<DailyNotesDataSyncResult> {
-    const t = getTranslator(this.settings.uiLanguage);
+    const t = getTranslator();
     if (this.syncing) {
       if (!options.suppressAlreadyRunningNotice) {
         new Notice(t("notice.alreadySyncing"));
@@ -1032,7 +962,7 @@ export class SyncEngine {
     forceFullRefresh: boolean,
     onProgress?: SyncProgress,
   ): Promise<DetailedHistorySyncResult> {
-    const t = getTranslator(this.settings.uiLanguage);
+    const t = getTranslator();
     const state = this.settings.historyState;
     const interval = this.settings.historyFullRefreshIntervalDays;
     const authoritativeFullRefreshMs = state.lastAuthoritativeFullRefreshAt
@@ -1049,7 +979,7 @@ export class SyncEngine {
       forceFullRefresh ||
       localBehindAuthoritative ||
       shouldRunFullRefresh(state, interval);
-    const startAt = fullRefresh ? "" : getIncrementalStartAt(state);
+    const startAt = fullRefresh ? "" : state.lastIncrementalSyncAt || "";
 
     onProgress?.(
       t(
@@ -1165,7 +1095,7 @@ export class SyncEngine {
     itemList: NormalizedItem[],
     onProgress?: SyncProgress,
   ): Promise<void> {
-    const t = getTranslator(this.settings.uiLanguage);
+    const t = getTranslator();
     if (!this.settings.tmdbApiKey) return;
     await processWithConcurrency(
       itemList.filter((item) => item.ids.tmdb),
@@ -1196,7 +1126,7 @@ export class SyncEngine {
     result: SyncResult,
     onProgress?: SyncProgress,
   ): Promise<void> {
-    const t = getTranslator(this.settings.uiLanguage);
+    const t = getTranslator();
     const folderPath = normalizePath(this.settings.folder);
     await ensureFolder(this.app, folderPath);
 

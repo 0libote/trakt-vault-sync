@@ -16,6 +16,7 @@ export class AuthModal extends Modal {
   private cancelled = false;
   private pollInterval: number | null = null;
   private countdownInterval: number | null = null;
+  private pollInFlight = false;
   private settings: TraktrSettings;
   private onSuccess: () => Promise<void>;
 
@@ -33,7 +34,7 @@ export class AuthModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass("traktr-auth-modal");
-    const t = getTranslator(this.settings.uiLanguage);
+    const t = getTranslator();
 
     contentEl.createEl("h2", { text: t("authModal.title") });
 
@@ -104,6 +105,8 @@ export class AuthModal extends Modal {
             this.clearCountdown();
             return;
           }
+          if (this.pollInFlight) return;
+          this.pollInFlight = true;
 
           try {
             const token = await pollDeviceToken(
@@ -136,6 +139,8 @@ export class AuthModal extends Modal {
               );
             }
             // For retryable errors (429), just skip this poll cycle
+          } finally {
+            this.pollInFlight = false;
           }
         })();
       }, pollIntervalMs);
@@ -179,7 +184,7 @@ export async function ensureValidToken(
   settings: TraktrSettings,
   saveSettings: () => Promise<void>,
 ): Promise<void> {
-  const t = getTranslator(settings.uiLanguage);
+  const t = getTranslator();
   if (!settings.accessToken || !settings.refreshToken) {
     throw new Error(t("auth.error.notConnected"));
   }
@@ -200,12 +205,17 @@ export async function ensureValidToken(
     settings.refreshToken = token.refresh_token;
     settings.tokenExpiresAt = (token.created_at + token.expires_in) * 1000;
     await saveSettings();
-  } catch {
-    // Clear tokens on refresh failure
-    settings.accessToken = "";
-    settings.refreshToken = "";
-    settings.tokenExpiresAt = 0;
-    await saveSettings();
-    throw new Error(t("auth.error.sessionExpired"));
+  } catch (error) {
+    if (
+      error instanceof TraktApiError &&
+      (error.statusCode === 400 || error.statusCode === 401)
+    ) {
+      settings.accessToken = "";
+      settings.refreshToken = "";
+      settings.tokenExpiresAt = 0;
+      await saveSettings();
+      throw new Error(t("auth.error.sessionExpired"));
+    }
+    throw new Error(t("auth.error.refreshFailed"));
   }
 }

@@ -33,15 +33,6 @@ export function shouldRunFullRefresh(
 }
 
 /**
- * Determine the `start_at` value to send to `/sync/history` for an
- * incremental fetch. Returns "" (no filter, full pull) when we don't
- * have a known incremental anchor yet.
- */
-export function getIncrementalStartAt(state: HistoryState): string {
-  return state.lastIncrementalSyncAt || "";
-}
-
-/**
  * Append new history events into the existing aggregated state. Idempotent:
  * replaying the same events doesn't add duplicate timestamps because we
  * dedupe by `id`.

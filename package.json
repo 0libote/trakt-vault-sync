@@ -5,13 +5,14 @@
   "main": "main.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/oliverheyburn/Trakt-Obsidian-Sync.git"
+    "url": "https://github.com/0libote/trakt-vault-sync.git"
   },
-  "homepage": "https://github.com/oliverheyburn/Trakt-Obsidian-Sync",
-  "bugs": "https://github.com/oliverheyburn/Trakt-Obsidian-Sync/issues",
+  "homepage": "https://github.com/0libote/trakt-vault-sync",
+  "bugs": "https://github.com/0libote/trakt-vault-sync/issues",
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "check": "npm run lint",
     "lint": "eslint src/",
     "test": "esbuild tests/smoke.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/stub-obsidian.ts --outfile=tests/.smoke.cjs --log-level=warning && node tests/.smoke.cjs"
   },
@@ -22,7 +23,7 @@
     "sync",
     "watchlist"
   ],
-  "author": "0libots",
+  "author": "0libote",
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^25.3.5",

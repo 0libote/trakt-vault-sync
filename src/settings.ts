@@ -7,7 +7,7 @@ import {
   normalizePath,
 } from "obsidian";
 import type TraktrPlugin from "./main";
-import { getTranslator, type StringKey, type UiLanguage } from "./strings";
+import { getTranslator, type StringKey } from "./strings";
 import { dedupeDuplicateNotes } from "./sync-engine";
 import {
   EMPTY_HISTORY_STATE,
@@ -55,41 +55,18 @@ export const POSTER_SIZES = [
 
 export type PosterSize = (typeof POSTER_SIZES)[number];
 
-export const BUILD_CREATED_AT = "2026-05-21 15:35:00 PDT";
+export const BUILD_CREATED_AT = "2026-06-30";
 
-/**
- * [0.5.0] Settings that can be marked as "device-local" per spec 0003.
- *
- * These are the settings whose semantics make per-device divergence
- * legitimate — auto-sync timing varies by device, UI language can vary
- * by user-of-device, etc. Everything else (auth tokens, sync content
- * toggles, metadata language, templates, etc.) always lives in data.json
- * and follows vault sync.
- *
- * Each device independently records WHICH of these keys are local on it
- * (the `_localKeys` array in localStorage). This means Mac can have
- * `uiLanguage` local while iPhone keeps it synced — the metadata about
- * who's local is itself device-local, not synced.
- */
+/** Settings that may differ between devices. */
 export const LOCAL_ELIGIBLE_KEYS = [
   "syncOnStartup",
   "autoSyncEnabled",
   "autoSyncIntervalMinutes",
   "dailyNotesAutoSyncEnabled",
   "dailyNotesAutoSyncIntervalMinutes",
-  "uiLanguage",
 ] as const;
 export type LocalEligibleKey = (typeof LOCAL_ELIGIBLE_KEYS)[number];
 
-/**
- * [0.5.0] On first 0.5.0 launch (no `_localKeys` in localStorage yet),
- * these keys default to local on that device. The auto-sync trio fits
- * here because cross-device sync of these settings causes redundant
- * syncs / Trakt API traffic for zero user benefit (each device should
- * pick its own cadence). `uiLanguage` defaults to SYNCED — most users
- * want the same UI language everywhere — but it remains togglable via
- * the cloud icon.
- */
 export const DEFAULT_LOCAL_KEYS: ReadonlyArray<LocalEligibleKey> = [
   "syncOnStartup",
   "autoSyncEnabled",
@@ -222,8 +199,6 @@ export interface TraktrSettings {
   // text that already promised this behaviour. Users who'd rather rename
   // manually flip this off. See spec 0009.
   autoRenameOnLanguageChange: boolean;
-  uiLanguage: UiLanguage;
-
   // Property namespace
   propertyPrefix: string;
 
@@ -392,7 +367,6 @@ export const DEFAULT_SETTINGS: TraktrSettings = {
   posterSize: "w500",
 
   autoRenameOnLanguageChange: true,
-  uiLanguage: "en",
 
   propertyPrefix: "trakt_",
 
@@ -481,7 +455,7 @@ export class TraktrSettingTab extends PluginSettingTab {
    * See spec 0005 §"Implementation skeleton".
    */
   private renderTabBar(parent: HTMLElement): void {
-    const t = getTranslator(this.plugin.settings.uiLanguage);
+    const t = getTranslator();
     const bar = parent.createDiv({ cls: "trakt-tab-bar" });
     for (const tabId of SETTINGS_TABS) {
       const btn = bar.createEl("button", {
@@ -513,7 +487,7 @@ export class TraktrSettingTab extends PluginSettingTab {
    * any dependent UI updates accordingly. See spec 0003.
    */
   private addLocalToggle(setting: Setting, key: LocalEligibleKey): Setting {
-    const t = getTranslator(this.plugin.settings.uiLanguage);
+    const t = getTranslator();
     return setting.addExtraButton((btn) => {
       const isLocal = this.plugin.localKeys.has(key);
       btn
@@ -533,7 +507,7 @@ export class TraktrSettingTab extends PluginSettingTab {
   private confirmAction(options: ConfirmDangerousActionOptions): Promise<boolean> {
     return confirmDangerousAction(
       this.plugin.app,
-      getTranslator(this.plugin.settings.uiLanguage),
+      getTranslator(),
       options,
     );
   }
@@ -541,7 +515,7 @@ export class TraktrSettingTab extends PluginSettingTab {
   private async generateBases(
     kinds: ReadonlyArray<BaseFileKind>,
   ): Promise<void> {
-    const t = getTranslator(this.plugin.settings.uiLanguage);
+    const t = getTranslator();
     const selected = new Set<BaseFileKind>(kinds);
     const definitions = getBaseFileDefinitions(this.plugin.settings).filter(
       (definition) => selected.has(definition.kind),
@@ -1096,7 +1070,7 @@ export class TraktrSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
-    const t = getTranslator(this.plugin.settings.uiLanguage);
+    const t = getTranslator();
 
     // [0.6.0] Tab navigation at the top — see spec 0005. The body
     // sections below are each gated by `this.activeTab` so only the
@@ -1147,6 +1121,7 @@ export class TraktrSettingTab extends PluginSettingTab {
         text
           .setPlaceholder(t("auth.clientSecret.name"))
           .setValue(this.plugin.settings.clientSecret)
+          .then((component) => component.inputEl.type = "password")
           .onChange(async (value) => {
             this.plugin.settings.clientSecret = value.trim();
             await this.plugin.saveSettings();
@@ -1219,6 +1194,7 @@ export class TraktrSettingTab extends PluginSettingTab {
         text
           .setPlaceholder(t("tmdb.apiKey.placeholder"))
           .setValue(this.plugin.settings.tmdbApiKey)
+          .then((component) => component.inputEl.type = "password")
           .onChange(async (value) => {
             this.plugin.settings.tmdbApiKey = value.trim();
             await this.plugin.saveSettings();
@@ -1793,7 +1769,7 @@ export class TraktrSettingTab extends PluginSettingTab {
           .setButtonText(t("syncMaintenance.dedupe.button"))
           .setWarning()
           .onClick(async () => {
-            const tNow = getTranslator(this.plugin.settings.uiLanguage);
+            const tNow = getTranslator();
             const confirmed = await this.confirmAction({
               title: "confirm.dedupe.title",
               body: "confirm.dedupe.body",
@@ -1854,10 +1830,8 @@ export class TraktrSettingTab extends PluginSettingTab {
               clientSecret,
               tokenExpiresAt,
               tmdbApiKey,
-              uiLanguage,
             } = this.plugin.settings;
-            // Preserve auth + UI language across reset; everything else
-            // goes back to its default.
+            // Preserve credentials across reset.
             Object.assign(this.plugin.settings, DEFAULT_SETTINGS, {
               accessToken,
               refreshToken,
@@ -1865,7 +1839,6 @@ export class TraktrSettingTab extends PluginSettingTab {
               clientSecret,
               tokenExpiresAt,
               tmdbApiKey,
-              uiLanguage,
             });
             await this.plugin.saveSettings();
             this.plugin.configureAutoSync();

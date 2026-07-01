@@ -12,3 +12,7 @@ sync, Daily Notes entries, incremental history refresh, and TMDB posters.
 
 The plugin only manages its own frontmatter keys and marker-bounded sections.
 Keep handwritten Daily Note content outside the Trakt markers.
+
+Credentials are stored unencrypted in
+`.obsidian/plugins/trakt-vault-sync/data.json`. Treat that file as sensitive;
+vault sync, backups, and Git may copy it.

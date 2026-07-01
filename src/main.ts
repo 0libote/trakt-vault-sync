@@ -15,7 +15,7 @@ import {
 } from "./settings";
 import { AuthModal } from "./trakt-auth";
 import { SyncEngine } from "./sync-engine";
-import { getTranslator, type UiLanguage } from "./strings";
+import { getTranslator } from "./strings";
 import { clearTmdbCache } from "./tmdb-api";
 import {
   buildSlimSyncedHistoryState,
@@ -135,18 +135,16 @@ export default class TraktrPlugin extends Plugin {
       }
     });
 
-    const t = getTranslator(this.settings.uiLanguage);
+    const t = getTranslator();
 
-    // Commands. Note: Obsidian caches command names at registration time, so
-    // changing the UI language requires reloading the plugin to refresh
-    // command palette labels. Documented behavior — not worth a bigger fix.
+    // Obsidian caches command names at registration time.
     this.addCommand({
       id: "trakt-sync",
       name: t("cmd.sync"),
       callback: async () => {
         if (!this.settings.accessToken) {
           new Notice(
-            getTranslator(this.settings.uiLanguage)("notice.notConnected"),
+            getTranslator()("notice.notConnected"),
           );
           return;
         }
@@ -158,7 +156,7 @@ export default class TraktrPlugin extends Plugin {
       id: "trakt-connect",
       name: t("cmd.connect"),
       callback: () => {
-        const tNow = getTranslator(this.settings.uiLanguage);
+        const tNow = getTranslator();
         if (!this.settings.clientId || !this.settings.clientSecret) {
           new Notice(tNow("notice.needCredentials"));
           return;
@@ -171,7 +169,7 @@ export default class TraktrPlugin extends Plugin {
       id: "trakt-disconnect",
       name: t("cmd.disconnect"),
       callback: async () => {
-        const tNow = getTranslator(this.settings.uiLanguage);
+        const tNow = getTranslator();
         const confirmed = await confirmDangerousAction(this.app, tNow, {
           title: "confirm.disconnect.title",
           body: "confirm.disconnect.body",
@@ -198,7 +196,7 @@ export default class TraktrPlugin extends Plugin {
       callback: async () => {
         if (!this.settings.accessToken) {
           new Notice(
-            getTranslator(this.settings.uiLanguage)("notice.notConnected"),
+            getTranslator()("notice.notConnected"),
           );
           return;
         }
@@ -214,7 +212,7 @@ export default class TraktrPlugin extends Plugin {
       id: "trakt-clear-tmdb-cache",
       name: t("cmd.clearTmdbCache"),
       callback: async () => {
-        const tNow = getTranslator(this.settings.uiLanguage);
+        const tNow = getTranslator();
         const confirmed = await confirmDangerousAction(this.app, tNow, {
           title: "confirm.clearTmdb.title",
           body: "confirm.clearTmdb.body",
@@ -235,7 +233,7 @@ export default class TraktrPlugin extends Plugin {
       id: "trakt-sync-daily-notes-today",
       name: t("cmd.syncDailyNotesToday"),
       callback: async () => {
-        const tNow = getTranslator(this.settings.uiLanguage);
+        const tNow = getTranslator();
         if (!this.settings.dailyNotesEnabled) {
           new Notice(tNow("daily.disabled"));
           return;
@@ -280,7 +278,7 @@ export default class TraktrPlugin extends Plugin {
   private async runSyncWithProgress(
     options: { forceFullHistoryRefresh?: boolean } = {},
   ): Promise<void> {
-    const tNow = getTranslator(this.settings.uiLanguage);
+    const tNow = getTranslator();
     const initialMsg = tNow("status.syncing");
     const progressNotice = new Notice(
       `${tNow("status.prefix")}${initialMsg}`,
@@ -305,7 +303,7 @@ export default class TraktrPlugin extends Plugin {
     } = {},
   ): Promise<boolean> {
     const showProgressNotice = options.showProgressNotice !== false;
-    const tNow = getTranslator(this.settings.uiLanguage);
+    const tNow = getTranslator();
     const initialMsg = tNow("status.dailySyncing");
     const progressNotice = showProgressNotice
       ? new Notice(`${tNow("status.prefix")}${initialMsg}`, 0)
@@ -344,7 +342,7 @@ export default class TraktrPlugin extends Plugin {
     );
     if (!refreshed) return;
 
-    const tNow = getTranslator(this.settings.uiLanguage);
+    const tNow = getTranslator();
     const host: DailyNotesHost = {
       app: this.app,
       settings: this.settings,
@@ -382,7 +380,7 @@ export default class TraktrPlugin extends Plugin {
       result.todayMode === "wrote_new" || result.todayMode === "overwrote";
     if (!todayUpdated && result.pastWrote === 0) return;
 
-    const t = getTranslator(this.settings.uiLanguage);
+    const t = getTranslator();
     const key = todayUpdated
       ? result.pastWrote > 0
         ? "daily.catchUpDone.withPast"
@@ -398,7 +396,7 @@ export default class TraktrPlugin extends Plugin {
       result.todayMode === "wrote_new" || result.todayMode === "overwrote";
     if (!todayUpdated && result.pastWrote === 0) return "";
 
-    const t = getTranslator(this.settings.uiLanguage);
+    const t = getTranslator();
     const key = todayUpdated
       ? result.pastWrote > 0
         ? "syncResult.dailyNotes.withPast"
@@ -666,10 +664,8 @@ export default class TraktrPlugin extends Plugin {
       await this.saveData(settings);
 
       // Surface the migration so the user knows what just happened.
-      // Translates to the user's saved UI language if available.
-      const lang: UiLanguage = settings.uiLanguage ?? "en";
       new Notice(
-        getTranslator(lang)("notice.migratedFromLegacyFolder"),
+        getTranslator()("notice.migratedFromLegacyFolder"),
         8000,
       );
       console.debug(
@@ -870,7 +866,7 @@ export default class TraktrPlugin extends Plugin {
 
   private updateStatusBar(status: string) {
     if (this.statusBarEl) {
-      const t = getTranslator(this.settings.uiLanguage);
+      const t = getTranslator();
       this.statusBarEl.setText(status ? `${t("status.prefix")}${status}` : "");
     }
   }

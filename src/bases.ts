@@ -654,7 +654,7 @@ function selectedOrderItems(
 }
 
 function buildFormulaSection(settings: TraktrSettings): string[] {
-  const t = getTranslator(settings.uiLanguage);
+  const t = getTranslator();
   const poster = propertyReference(settings, "poster_url");
   const communityRating = propertyReference(settings, "rating");
   const personalRating = propertyReference(settings, "my_rating");
@@ -683,7 +683,7 @@ function buildFormulaSection(settings: TraktrSettings): string[] {
 }
 
 function buildPropertiesSection(settings: TraktrSettings): string[] {
-  const t = getTranslator(settings.uiLanguage);
+  const t = getTranslator();
   const lines = [
     "properties:",
     "  file.name:",
@@ -753,7 +753,7 @@ function buildBaseFilters(
 }
 
 function buildBase(settings: TraktrSettings, kind: BaseFileKind): string {
-  const t = getTranslator(settings.uiLanguage);
+  const t = getTranslator();
   const filters = buildBaseFilters(settings, kind);
   const fields = selectedOrderItems(settings, kind);
   const name = t(BASE_NAME_KEY[kind]);
@@ -814,7 +814,7 @@ export function buildBasePropertyName(prefix: string, key: string): string {
 export function getBaseFileDefinitions(
   settings: TraktrSettings,
 ): BaseFileDefinition[] {
-  const definitionOrder: ReadonlyArray<BaseFileKind> = [
+  const kinds: BaseFileKind[] = [
     "movies",
     "shows",
     "watchlist",
@@ -822,7 +822,7 @@ export function getBaseFileDefinitions(
     "ratings",
     "library",
   ];
-  return definitionOrder.map((kind) => ({
+  return kinds.map((kind) => ({
     kind,
     filename: BASE_FILENAME[kind],
     content: buildBase(settings, kind),

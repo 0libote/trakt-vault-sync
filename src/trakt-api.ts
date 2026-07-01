@@ -129,6 +129,7 @@ export async function refreshAccessToken(
       redirect_uri: "urn:ietf:wg:oauth:2.0:oob",
       grant_type: "refresh_token",
     }),
+    throw: false,
   });
 
   if (resp.status !== 200) {

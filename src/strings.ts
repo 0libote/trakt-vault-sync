@@ -196,7 +196,7 @@ export const STRINGS = {
   "auth.connection.disconnectedNotice": "Trakt Vault Sync: disconnected.",
   "auth.connection.needCredentialsNotice": "Trakt Vault Sync: fill in client ID and secret first.",
   "auth.sync.name": "Cross-device sync",
-  "auth.sync.desc": "Settings are stored in this vault's plugin data folder.",
+  "auth.sync.desc": "Credentials and settings are stored unencrypted in this vault's plugin data.json file. Vault sync, backups, or Git may copy them to other devices or services.",
   "tmdb.heading": "TMDB",
   "tmdb.apiKey.name": "API key",
   "tmdb.apiKey.desc": "Recommended for poster images and metadata.",
@@ -356,14 +356,13 @@ export const STRINGS = {
   "authModal.failedStart": "Failed to start auth: {msg}",
   "auth.error.notConnected": "Not connected to Trakt.",
   "auth.error.sessionExpired": "Trakt session expired. Please reconnect.",
+  "auth.error.refreshFailed": "Could not refresh the Trakt session. Your saved session was kept; try again later.",
 } as const;
 
 export type StringKey = keyof typeof STRINGS;
-export type UiLanguage = "en";
 
 export function t(
   key: StringKey,
-  _language: UiLanguage = "en",
   vars?: Record<string, string | number>,
 ): string {
   let value: string = STRINGS[key];
@@ -373,7 +372,7 @@ export function t(
   return value;
 }
 
-export function getTranslator(_language: UiLanguage = "en") {
+export function getTranslator() {
   return (key: StringKey, vars?: Record<string, string | number>) =>
-    t(key, "en", vars);
+    t(key, vars);
 }
