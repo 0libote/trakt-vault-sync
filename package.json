@@ -27,12 +27,12 @@
   "author": "0libote",
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "^25.3.5",
-    "@typescript-eslint/parser": "^8.56.1",
-    "esbuild": "0.27.3",
-    "eslint": "^9",
-    "eslint-plugin-obsidianmd": "^0.1.9",
+    "@types/node": "^26.1.1",
+    "@typescript-eslint/parser": "^8.64.0",
+    "esbuild": "0.28.1",
+    "eslint": "^10",
+    "eslint-plugin-obsidianmd": "^0.4.1",
     "obsidian": "latest",
-    "typescript": "5.9.3"
+    "typescript": "7.0.2"
   }
 }
