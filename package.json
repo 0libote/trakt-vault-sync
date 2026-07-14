@@ -27,7 +27,7 @@
   "author": "0libote",
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "^25.3.5",
+    "@types/node": "^26.1.0",
     "@typescript-eslint/parser": "^8.63.0",
     "esbuild": "0.28.1",
     "eslint": "^9",
