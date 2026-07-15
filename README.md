@@ -12,11 +12,13 @@ That project was itself based on
 
 ## Development
 
+Requires Bun 1.3.14 or newer.
+
 ```bash
-npm ci
-npm run dev
-npm run build
-npm run lint
+bun ci
+bun run dev
+bun run build
+bun run lint
 ```
 
 `main.js` is generated and is not committed.
