@@ -33,7 +33,7 @@ jobs:
           }
           if (process.env.PR_TITLE.includes('typescript from 6.0.3 to 7.0.2')) {
             pkg.devDependencies['@typescript/native'] = 'npm:typescript@^7.0.2';
-            pkg.devDependencies.typescript = 'npm:@typescript/typescript6@^6.0.3';
+            pkg.devDependencies.typescript = 'npm:@typescript/typescript6@^6.0.2';
           }
           fs.writeFileSync('package.json', `${JSON.stringify(pkg, null, 2)}\n`);
           NODE
