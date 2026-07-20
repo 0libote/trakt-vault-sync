@@ -20,7 +20,8 @@
     "build": "tsc -noEmit -skipLibCheck && bun esbuild.config.mjs production",
     "check": "bun run lint",
     "lint": "eslint src/",
-    "test": "esbuild tests/smoke.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/stub-obsidian.ts --outfile=tests/.smoke.cjs --log-level=warning && bun tests/.smoke.cjs"
+    "test": "esbuild tests/smoke.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/stub-obsidian.ts --outfile=tests/.smoke.cjs --log-level=warning && bun tests/.smoke.cjs",
+    "verify": "bun run audit && bun run test && bun run lint && bun run build"
   },
   "keywords": [
     "obsidian",
@@ -40,7 +41,7 @@
     "@types/node": "26.1.1",
     "@typescript-eslint/parser": "^8.63.0",
     "esbuild": "0.28.1",
-    "eslint": "^10",
+    "eslint": "^10.7.0",
     "eslint-plugin-obsidianmd": "^0.1.9",
     "obsidian": "latest",
     "typescript": "6.0.3"
