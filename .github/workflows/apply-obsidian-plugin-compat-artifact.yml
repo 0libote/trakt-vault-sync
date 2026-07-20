@@ -1,0 +1,72 @@
+name: Apply Obsidian plugin compatibility artifact
+
+on:
+  workflow_run:
+    workflows: ["Generate Obsidian plugin compatibility artifact"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: write
+  pull-requests: read
+
+jobs:
+  apply:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Resolve validated Dependabot pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name }}
+        run: |
+          set -euo pipefail
+          test "$HEAD_REPOSITORY" = "$REPOSITORY"
+          test "$HEAD_BRANCH" = 'dependabot/bun/eslint-plugin-obsidianmd-0.4.1'
+          owner=${REPOSITORY%%/*}
+          pr_json=$(gh api "repos/$REPOSITORY/pulls?state=open&head=$owner:$HEAD_BRANCH" --jq '.[0]')
+          test "$(jq -r '.user.login' <<<"$pr_json")" = 'dependabot[bot]'
+          jq -er '.title | contains("eslint-plugin-obsidianmd from 0.1.9 to 0.4.1")' <<<"$pr_json" >/dev/null
+          echo "number=$(jq -r '.number' <<<"$pr_json")" >> "$GITHUB_OUTPUT"
+      - name: Download verified artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: gh run download "$RUN_ID" --repo "$REPOSITORY" --name "obsidian-plugin-compat-$PR_NUMBER" --dir generated
+      - name: Check out validated branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+      - name: Validate exact compatibility transformation
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          original_path = Path('src/settings.ts')
+          generated_path = Path('generated/src/settings.ts')
+          original = original_path.read_text(encoding='utf-8')
+          generated = generated_path.read_text(encoding='utf-8')
+          if original.count('.setDestructive()') != 5:
+              raise SystemExit('Branch no longer contains the five reviewed API calls')
+          expected = original.replace('.setDestructive()', '.setWarning()')
+          if generated != expected:
+              raise SystemExit('Artifact contains changes beyond the reviewed API substitution')
+          original_path.write_text(generated, encoding='utf-8')
+          PY
+      - name: Commit verified compatibility patch
+        env:
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          git add src/settings.ts
+          git diff --cached --quiet && exit 0
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix: preserve destructive button styling compatibility'
+          git push origin "HEAD:$HEAD_BRANCH"
