@@ -15,6 +15,7 @@
   "homepage": "https://github.com/0libote/trakt-vault-sync",
   "bugs": "https://github.com/0libote/trakt-vault-sync/issues",
   "scripts": {
+    "audit": "bun audit --audit-level=high",
     "dev": "bun esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && bun esbuild.config.mjs production",
     "check": "bun run lint",
