@@ -62,7 +62,8 @@ jobs:
               'The Dependabot compatibility score in the PR description remains the upstream bot risk indicator.' \
               'The verification job used a read-only token; this review job did not check out or execute pull-request code.')
           else
-            failed_log=$(gh run view "$RUN_ID" --repo "$REPOSITORY" --log-failed 2>&1 | tail -n 80 || true)
+            verify_job_id=$(gh api "repos/$REPOSITORY/actions/runs/$RUN_ID/jobs" --jq '.jobs[] | select(.name == "verify") | .id' | head -n 1)
+            failed_log=$(gh api "repos/$REPOSITORY/actions/jobs/$verify_job_id/logs" 2>&1 | tail -n 100 || true)
             body=$(printf '%s\n\n%s\n%s\n%s\n\n```text\n%s\n```' \
               'Automated dependency code review: BLOCKED.' \
               "PR: $PR_TITLE" \
