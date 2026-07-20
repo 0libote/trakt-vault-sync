@@ -17,7 +17,7 @@
   "scripts": {
     "audit": "bun audit --audit-level=high",
     "dev": "bun esbuild.config.mjs",
-    "build": "tsc -noEmit -skipLibCheck && bun esbuild.config.mjs production",
+    "build": "node node_modules/@typescript/native/bin/tsc --noEmit --skipLibCheck && bun esbuild.config.mjs production",
     "check": "bun run lint",
     "lint": "eslint src/",
     "prepublishOnly": "bun run verify",
@@ -41,6 +41,7 @@
   "devDependencies": {
     "@types/node": "26.1.1",
     "@typescript-eslint/parser": "^8.63.0",
+    "@typescript/native": "npm:typescript@7.0.2",
     "esbuild": "0.28.1",
     "eslint": "^10.7.0",
     "eslint-plugin-obsidianmd": "0.4.1",
