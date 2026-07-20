@@ -1,0 +1,55 @@
+name: Generate Obsidian plugin compatibility artifact
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      contains(github.event.pull_request.title, 'eslint-plugin-obsidianmd from 0.1.9 to 0.4.1')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out pull request
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - name: Replace unsupported destructive button API
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path('src/settings.ts')
+          original = path.read_text(encoding='utf-8')
+          count = original.count('.setDestructive()')
+          if count != 5:
+              raise SystemExit(f'Expected exactly 5 setDestructive calls, found {count}')
+          updated = original.replace('.setDestructive()', '.setWarning()')
+          path.write_text(updated, encoding='utf-8')
+          PY
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+      - name: Audit dependencies
+        run: bun audit --audit-level=high
+      - name: Run smoke tests
+        run: bun run test
+      - name: Run lint
+        run: bun run lint
+      - name: Build release bundle
+        run: bun run build
+      - name: Upload reviewed source file
+        uses: actions/upload-artifact@v4
+        with:
+          name: obsidian-plugin-compat-${{ github.event.pull_request.number }}
+          path: src/settings.ts
+          if-no-files-found: error
+          retention-days: 1
