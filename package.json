@@ -27,7 +27,9 @@
   "author": "0libote",
   "license": "MIT",
   "overrides": {
-    "fast-uri": "3.1.2"
+    "fast-uri": "3.1.2",
+    "flatted": "3.4.0",
+    "picomatch": "4.0.4"
   },
   "devDependencies": {
     "@types/node": "^26.1.0",
