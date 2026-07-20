@@ -1140,7 +1140,7 @@ export class TraktrSettingTab extends PluginSettingTab {
       connectionSetting.addButton((btn) =>
         btn
           .setButtonText(t("auth.connection.disconnect"))
-          .setDestructive()
+          .setWarning()
           .onClick(async () => {
             const confirmed = await this.confirmAction({
               title: "confirm.disconnect.title",
@@ -1290,7 +1290,7 @@ export class TraktrSettingTab extends PluginSettingTab {
       .addButton((btn) =>
         btn
           .setButtonText(t("tmdb.cache.clear.button"))
-          .setDestructive()
+          .setWarning()
           .onClick(async () => {
             const confirmed = await this.confirmAction({
               title: "confirm.clearTmdb.title",
@@ -1561,7 +1561,7 @@ export class TraktrSettingTab extends PluginSettingTab {
           .addButton((btn) =>
             btn
               .setButtonText(t("history.state.clear.button"))
-              .setDestructive()
+              .setWarning()
               .onClick(async () => {
                 const confirmed = await this.confirmAction({
                   title: "confirm.clearHistory.title",
@@ -1766,7 +1766,7 @@ export class TraktrSettingTab extends PluginSettingTab {
       .addButton((btn) =>
         btn
           .setButtonText(t("syncMaintenance.dedupe.button"))
-          .setDestructive()
+          .setWarning()
           .onClick(async () => {
             const tNow = getTranslator();
             const confirmed = await this.confirmAction({
@@ -1814,7 +1814,7 @@ export class TraktrSettingTab extends PluginSettingTab {
       .addButton((btn) =>
         btn
           .setButtonText(t("reset.button.name"))
-          .setDestructive()
+          .setWarning()
           .onClick(async () => {
             const confirmed = await this.confirmAction({
               title: "confirm.reset.title",

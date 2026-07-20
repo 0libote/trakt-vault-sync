@@ -2,7 +2,7 @@
   "id": "trakt-vault-sync",
   "name": "Trakt Vault Sync",
   "version": "1.0.2",
-  "minAppVersion": "1.8.7",
+  "minAppVersion": "1.13.0",
   "description": "Sync Trakt watchlists, history, favorites, and ratings into Markdown notes.",
   "author": "0libote",
   "authorUrl": "https://github.com/0libote",
