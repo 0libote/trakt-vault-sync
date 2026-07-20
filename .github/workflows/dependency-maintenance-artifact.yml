@@ -28,12 +28,20 @@ jobs:
           node <<'NODE'
           const fs = require('node:fs');
           const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          if (pkg.overrides?.['fast-uri'] !== '3.1.2') {
-            throw new Error('Expected fast-uri 3.1.2 security override from the default branch');
+          const expectedOverrides = {
+            'fast-uri': '3.1.2',
+            flatted: '3.4.2',
+            picomatch: '4.0.4',
+          };
+          for (const [name, version] of Object.entries(expectedOverrides)) {
+            if (pkg.overrides?.[name] !== version) {
+              throw new Error(`Expected trusted ${name} ${version} security override from the default branch`);
+            }
           }
           if (process.env.PR_TITLE.includes('typescript from 6.0.3 to 7.0.2')) {
-            pkg.devDependencies['@typescript/native'] = 'npm:typescript@^7.0.2';
-            pkg.devDependencies.typescript = 'npm:@typescript/typescript6@^6.0.2';
+            pkg.devDependencies['@typescript/native'] = 'npm:typescript@7.0.2';
+            pkg.devDependencies.typescript = '6.0.3';
+            pkg.scripts.build = 'node node_modules/@typescript/native/bin/tsc --noEmit --skipLibCheck && bun esbuild.config.mjs production';
           }
           fs.writeFileSync('package.json', `${JSON.stringify(pkg, null, 2)}\n`);
           NODE
