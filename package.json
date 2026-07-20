@@ -20,17 +20,13 @@
     "lint": "eslint src/",
     "test": "esbuild tests/smoke.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/stub-obsidian.ts --outfile=tests/.smoke.cjs --log-level=warning && bun tests/.smoke.cjs"
   },
-  "keywords": [
-    "obsidian",
-    "trakt",
-    "obsidian-plugin",
-    "sync",
-    "watchlist"
-  ],
+  "keywords": ["obsidian", "trakt", "obsidian-plugin", "sync", "watchlist"],
   "author": "0libote",
   "license": "MIT",
   "overrides": {
-    "fast-uri": "3.1.2"
+    "fast-uri": "3.1.2",
+    "flatted": "3.4.0",
+    "picomatch": "4.0.4"
   },
   "devDependencies": {
     "@types/node": "^26.1.0",
