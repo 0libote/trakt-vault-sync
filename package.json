@@ -15,7 +15,7 @@
   "bugs": "https://github.com/0libote/trakt-vault-sync/issues",
   "scripts": {
     "dev": "bun esbuild.config.mjs",
-    "build": "tsc -noEmit -skipLibCheck && bun esbuild.config.mjs production",
+    "build": "node node_modules/@typescript/native/bin/tsc --noEmit --skipLibCheck && bun esbuild.config.mjs production",
     "check": "bun run lint",
     "lint": "eslint src/",
     "test": "esbuild tests/smoke.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/stub-obsidian.ts --outfile=tests/.smoke.cjs --log-level=warning && bun tests/.smoke.cjs"
@@ -31,7 +31,7 @@
   "license": "MIT",
   "overrides": {
     "fast-uri": "3.1.2",
-    "flatted": "3.4.0",
+    "flatted": "3.4.2",
     "picomatch": "4.0.4"
   },
   "devDependencies": {
@@ -42,6 +42,6 @@
     "eslint": "^10",
     "eslint-plugin-obsidianmd": "^0.1.9",
     "obsidian": "latest",
-    "typescript": "npm:@typescript/typescript6@6.0.2"
+    "typescript": "6.0.3"
   }
 }
