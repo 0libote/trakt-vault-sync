@@ -40,6 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
+      actions: read
       contents: read
       pull-requests: write
     steps:
@@ -48,6 +49,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_URL: ${{ github.event.pull_request.html_url }}
           PR_TITLE: ${{ github.event.pull_request.title }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
           VERIFY_RESULT: ${{ needs.verify.result }}
         run: |
           set -euo pipefail
@@ -59,11 +62,13 @@ jobs:
               'The Dependabot compatibility score in the PR description remains the upstream bot risk indicator.' \
               'The verification job used a read-only token; this review job did not check out or execute pull-request code.')
           else
-            body=$(printf '%s\n\n%s\n%s\n%s' \
+            failed_log=$(gh run view "$RUN_ID" --repo "$REPOSITORY" --log-failed 2>&1 | tail -n 80 || true)
+            body=$(printf '%s\n\n%s\n%s\n%s\n\n```text\n%s\n```' \
               'Automated dependency code review: BLOCKED.' \
               "PR: $PR_TITLE" \
-              "Verification result: $VERIFY_RESULT. Review the failed GitHub Actions steps before merging." \
-              'No pull-request code was executed with this review job’s write-enabled token.')
+              "Verification result: $VERIFY_RESULT. The failed-step output is included below." \
+              'No pull-request code was executed with this review job’s write-enabled token.' \
+              "$failed_log")
           fi
           gh pr review "$PR_URL" --comment --body "$body"
           test "$VERIFY_RESULT" = "success"
