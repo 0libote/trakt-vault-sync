@@ -33,7 +33,7 @@
     "@types/node": "^26.1.0",
     "@typescript-eslint/parser": "^8.63.0",
     "esbuild": "0.28.1",
-    "eslint": "^10",
+    "eslint": "^10.7.0",
     "eslint-plugin-obsidianmd": "^0.1.9",
     "obsidian": "latest",
     "typescript": "6.0.3"
