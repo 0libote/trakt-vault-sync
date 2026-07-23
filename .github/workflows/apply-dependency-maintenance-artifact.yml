@@ -43,7 +43,7 @@ jobs:
           PR_NUMBER: ${{ steps.pr.outputs.number }}
         run: gh run download "$RUN_ID" --repo "$REPOSITORY" --name "dependency-maintenance-$PR_NUMBER" --dir generated
       - name: Check out validated Dependabot branch
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_branch }}
       - name: Validate artifact and update lockfile only
